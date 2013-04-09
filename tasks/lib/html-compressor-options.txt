@@ -1,0 +1,17 @@
+	 -c, --charset <charset>       Charset for reading files, UTF-8 by default
+	 --preserve-comments           Preserve comments
+	 --preserve-multi-spaces       Preserve multiple spaces
+	 --preserve-line-breaks        Preserve line breaks
+	 --remove-intertag-spaces      Remove intertag spaces
+	 --remove-quotes               Remove unneeded quotes
+	 --simple-doctype              Change doctype to <!DOCTYPE html>
+	 --remove-style-attr           Remove TYPE attribute from STYLE tags
+	 --remove-link-attr            Remove TYPE attribute from LINK tags
+	 --remove-script-attr          Remove TYPE and LANGUAGE from SCRIPT tags
+	 --remove-form-attr            Remove METHOD="GET" from FORM tags
+	 --remove-input-attr           Remove TYPE="TEXT" from INPUT tags
+	 --simple-bool-attr            Remove values from boolean tag attributes
+	 --remove-js-protocol          Remove "javascript:" from inline event handlers
+	 --remove-http-protocol        Remove "http:" from tag attributes
+	 --remove-https-protocol       Remove "https:" from tag attributes
+	 --remove-surrounding-spaces <min|max|all|custom_list>

@@ -1,0 +1,50 @@
+{
+  "name": "grunt-yomb",
+  "version": "0.1.5",
+  "description": "YOM builder",
+  "keywords": [
+    "YOM",
+    "builder",
+    "gruntplugin"
+  ],
+  "homepage": "https://github.com/webyom/yomb",
+  "author": {
+    "name": "Gary Wang",
+    "email": "webyom@gmail.com",
+    "url": "http://webyom.org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webyom/yomb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/webyom/yomb/issues"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/webyom/yomb.git/blob/master/LICENSE-MIT"
+    }
+  ],
+  "main": "Gruntfile.js",
+  "engines": {
+    "node": ">= 0.8.0"
+  },
+  "scripts": {
+    "test": "grunt test"
+  },
+  "dependencies": {
+    "uglify-js": "~2.2.5",
+    "cssmin": "~0.3.2",
+    "less": "~1.3.3"
+  },
+  "devDependencies": {
+    "grunt-contrib-jshint": "~0.1.1",
+    "grunt-contrib-clean": "~0.4.0",
+    "grunt-contrib-nodeunit": "~0.1.2",
+    "grunt": "~0.4.1"
+  },
+  "peerDependencies": {
+    "grunt": "~0.4.1"
+  }
+}
