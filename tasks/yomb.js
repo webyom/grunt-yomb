@@ -57,7 +57,7 @@ var done
 
 function exit(code, type) {
 	printLine()
-	log((code ? 'Terminated' : 'Finished') + '! Spent Time: ' + (new Date() - startTime) + 'ms', 0, true)
+	log((code ? 'Terminated' : 'Finished') + '! Spent ' + (new Date() - startTime) + 'ms', 0, true)
 	printLine('+')
 	if(type) {
 		grunt.file.write(path.resolve(buildDir, 'yomb-' + type + '.log'), logs.join(os.EOL), {encoding: charset})
@@ -804,6 +804,7 @@ function init(options, callback) {
 	globalExclude = utils.getDefinedItem([utils.getHashFromString(grunt.option('yomb-exclude')) || undefined, options.exclude, globalExclude])
 	globalBanner = options.banner || globalBanner
 	logs = []
+	startTime = new Date()
 	if(options.lang) {
 		lang.getLangResource(path.resolve(buildDir, options.lang.base), function(res) {
 			langResource = res
@@ -814,6 +815,7 @@ function init(options, callback) {
 	}
 	init = function(options, callback) {
 		logs = []
+		startTime = new Date()
 		callback()
 	}
 }
@@ -827,17 +829,17 @@ module.exports = function(grunt) {
 		init(options, function() {
 			printLine('+')
 			if(targetType === 'build') {
-				log('Start! Time: ' + startTime, 0, true)
+				log('Started at ' + grunt.template.today('yyyy-mm-dd hh:MM:ss'), 0, true)
 				done = self.async()
 				buildList = self.files || []
 				build()
 			} else if(targetType === 'concat') {
-				log('Start! Time: ' + startTime, 0, true)
+				log('Started at ' + grunt.template.today('yyyy-mm-dd hh:MM:ss'), 0, true)
 				done = self.async()
 				combineList = self.files || []
 				combine()
 			} else if(targetType === 'copy') {
-				log('Start! Time: ' + startTime, 0, true)
+				log('Started at ' + grunt.template.today('yyyy-mm-dd hh:MM:ss'), 0, true)
 				done = self.async()
 				copyList = self.files || []
 				copy()
