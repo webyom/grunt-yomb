@@ -829,17 +829,17 @@ module.exports = function(grunt) {
 		init(options, function() {
 			printLine('+')
 			if(targetType === 'build') {
-				log('Started at ' + grunt.template.today('yyyy-mm-dd hh:MM:ss'), 0, true)
+				log('Started at ' + grunt.template.today('yyyy-mm-dd HH:MM:ss'), 0, true)
 				done = self.async()
 				buildList = self.files || []
 				build()
 			} else if(targetType === 'concat') {
-				log('Started at ' + grunt.template.today('yyyy-mm-dd hh:MM:ss'), 0, true)
+				log('Started at ' + grunt.template.today('yyyy-mm-dd HH:MM:ss'), 0, true)
 				done = self.async()
 				combineList = self.files || []
 				combine()
 			} else if(targetType === 'copy') {
-				log('Started at ' + grunt.template.today('yyyy-mm-dd hh:MM:ss'), 0, true)
+				log('Started at ' + grunt.template.today('yyyy-mm-dd HH:MM:ss'), 0, true)
 				done = self.async()
 				copyList = self.files || []
 				copy()
