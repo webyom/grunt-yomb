@@ -769,11 +769,12 @@ function copyOne(info, callback, _deep) {
 		callback()
 	}
 	function copy() {
-		var inputFile, outputFile
+		var fileName, inputFile, outputFile
 		if(copyList.length) {
-			inputFile = path.resolve(input, copyList.shift())
+			fileName = copyList.shift()
+			inputFile = path.resolve(input, fileName)
 			outputFile = path.resolve(output, path.basename(inputFile))
-			if(filterRegexp && !new RegExp(filterRegexp).test(inputFile) && !fs.statSync(inputFile).isDirectory() || inputFile == output || path.relative(output, inputFile).indexOf('..') != 0 || path.relative(inputFile, output).indexOf('..') != 0) {
+			if(filterRegexp && !new RegExp(filterRegexp).test(fileName) && !fs.statSync(inputFile).isDirectory() || inputFile == output || path.relative(output, inputFile).indexOf('..') != 0 || path.relative(inputFile, output).indexOf('..') != 0) {
 				copy()
 			} else {
 				copyOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
