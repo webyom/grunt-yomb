@@ -63,7 +63,11 @@ exports.getLangResource = (function() {
 				}
 			})()
 		} else if(path.extname(langPath) == '.js') {
-			res = eval(fs.readFileSync(langPath, charset))
+			try {
+				res = eval(fs.readFileSync(langPath, charset))
+			} catch(e) {
+				throw new Error('Language file "' + langPath + '" syntax error! - ' + e.toString())
+			}
 			if(typeof res == 'function') {
 				res = res()
 			}
