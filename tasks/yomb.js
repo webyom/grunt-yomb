@@ -352,7 +352,8 @@ function compileTmpl(input, type, info, opt) {
 				.replace(/[\v]/g, EOL)
 				.replace(/<%==(.*?)%>/g, "', $encodeHtml($1), '")
 				.replace(/<%=(.*?)%>/g, "', $1, '")
-				.split("<%").join("')" + EOL + "		")
+				.replace(/<%(<-)?/g, "')" + EOL + "		")
+				.replace(/->(\w+)%>/g, EOL + "		$1.push('")
 				.split("%>").join(EOL + "		_$out_.push('") + "')",
 		"		" + (strict ? "" : "}"),
 		"		return _$out_.join('')",
