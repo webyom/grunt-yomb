@@ -358,7 +358,7 @@ function compileTmpl(input, type, info, opt) {
 		"		" + (strict ? "" : "}"),
 		"		return _$out_.join('')",
 		"	}"
-	].join(EOL)).replace(/_\$out_\.push\(''\)/g, ''))
+	].join(EOL).replace(/_\$out_\.push\(''\)/g, ''))
 	if(type == 'NODE') {
 		//do nothing
 	} else if(type == 'AMD') {
