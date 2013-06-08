@@ -14,6 +14,7 @@ var grunt = require('grunt')
 var uglify = require('uglify-js')
 var less = require('less')
 var cssmin = require('cssmin').cssmin
+var coffee = require('coffee-script')
 var utils = require('./lib/utils')
 var lang = require('./lib/lang')
 var replaceProperties = require('./lib/properties').replaceProperties
@@ -53,6 +54,7 @@ var globalExclude = {}
 var globalBanner = ''
 var properties
 var langResource
+var coffeeOptions = {}
 var done
 
 function exit(code, type) {
@@ -401,12 +403,165 @@ function fixDefineParams(def, depId, baseId) {
 	return def
 }
 
+function getBuiltAmdModContent(input, info, opt) {
+	input = path.resolve(input)
+	opt = opt || {}
+	var inputDir = path.dirname(input)
+	var fileContent = []
+	var depId, deps, fileName, content
+	var reverseDepMap = utils.cloneObject(opt.reverseDepMap) || {}
+	if(reverseDepMap[input]) {
+		log('Warn: "' + input + '" have circular reference!')
+		return ''
+	}
+	reverseDepMap[input] = 1
+	content = fs.readFileSync(input, charset)
+	deps = traversalGetRelativeDeps(inputDir, content, info.exclude)
+	while(deps.length) {
+		depId = deps.shift()
+		if((/\.tpl\.html?$/).test(depId)) {
+			fileName = path.resolve(inputDir, depId)
+			if(reverseDepMap[fileName]) {
+				log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
+				continue
+			}
+			log('Merging: ' + fileName)
+			fileContent.push(fixDefineParams(compileTmpl(fileName, 'AMD', info, {id: depId, reverseDepMap: reverseDepMap}), depId, opt.id))
+		} else {
+			fileName = path.resolve(inputDir, depId + '.js')
+			if(reverseDepMap[fileName]) {
+				log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
+				continue
+			}
+			log('Merging: ' + fileName)
+			fileContent.push(fixDefineParams(fs.readFileSync(fileName, charset), depId, opt.id))
+		}
+	}
+	fileContent.push(fixDefineParams(content, opt.id))
+	return fileContent.join(EOLEOL)
+}
+
+function compileLess(input, callback) {
+	less.render(fs.readFileSync(input, charset), {
+		paths: [path.dirname(input)], // Specify search paths for @import directives
+		strictMaths: false,
+		strictUnits: false,
+		filename: input // Specify a filename, for better error messages
+	}, function(err, css) {
+		if(err) {
+			dealErr(JSON.stringify(err))
+		}
+		callback(css)
+	})
+}
+
+function checkCondition(condition) {
+	var type, tmp
+	if(!condition) {
+		return true
+	}
+	tmp = condition.split(/\s*:\s*/)
+	type = tmp[0]
+	condition = tmp[1]
+	if(type == 'property') {
+		with(properties || {}) {
+			return eval(condition)
+		}
+	}
+	return true
+}
+
+function compileDirCoffee(info, callback, baseName) {
+	if(!checkCondition(info.condition)) {
+		callback()
+		return
+	}
+	baseName = baseName || ''
+	var inputDir = path.resolve(buildDir, info.input)
+	var outputDir = typeof info.output == 'undefined' ? inputDir : path.resolve(buildDir, outputBasePath, info.output, baseName)
+	var compileList = fs.readdirSync(inputDir)
+	var ignore = info.ignore || {}
+	if(!baseName/*avoid recalculating*/ && info.ignore) {
+		ignore = {}
+		for(var dir in info.ignore) {
+			if(info.ignore.hasOwnProperty(dir)) {
+				ignore[path.join(inputDir, dir)] = 1
+			}
+		}
+	}
+	compiles()
+	function compiles() {
+		var inputFile, outputFile, nodeTplOutputFile, fileName, langList, tmp
+		if(compileList.length) {
+			inputFile = path.resolve(inputDir, compileList.shift())
+			if(ignore[inputFile] || (/^\.|~$/).test(path.basename(inputFile))) {
+				compiles()
+			} else if(path.extname(inputFile) == '.coffee') {
+				fileName = path.basename(inputFile).replace(/\.coffee$/, '.js')
+				outputFile = path.join(outputDir, fileName)
+				compileOneCoffee(utils.extendObject(utils.cloneObject(info), {inputs: [inputFile], output: outputFile}), function() {
+					compiles()
+				}, true)
+			} else if(fs.statSync(inputFile).isDirectory() && !(inputFile == outputDir || path.relative(inputFile, outputDir).indexOf('..') != 0)) {
+				compileDirCoffee({input: inputFile, output: info.output, ignore: ignore}, function() {
+					compiles()
+				}, baseName ? baseName + '/' + path.basename(inputFile) : path.basename(inputFile))
+			} else {
+				compiles()
+			}
+		} else {
+			callback()
+		}
+	}
+}
+
+function compileOneCoffee(info, callback, allowSrcOutput) {
+	if(!checkCondition(info.condition)) {
+		callback()
+		return
+	}
+	var input, i
+	var inputs = info.inputs
+	var output = path.resolve(buildDir, outputBasePath, typeof info.output == 'undefined' ? inputs[0].replace(new RegExp(path.extname(inputs[0]) + '$'), '.js') : info.output)
+	var outputDir = path.dirname(output)
+	var codes = []
+	for(i = 0; i < inputs.length; i++) {
+		input = path.resolve(buildDir, inputs[i])
+		if(input == output) {
+			printLine()
+			log('Build')
+			log('Input: ' + input)
+			log('Output: ' + output)
+			throw new Error('Input and output must not be the same!')
+		}
+		if(!grunt.file.exists(input)) {
+			log('File "' + input + '" does not exists!')
+			log('Done!')
+			callback()
+			return
+		}
+		codes.push(fs.readFileSync(input, charset))
+	}
+	printLine()
+	log('Build')
+	log('Input: ' + input)
+	log('Output: ' + output)
+	if(!globalAllowSrcOutput && !allowSrcOutput && !isSrcDir(outputDir)) {
+		throw new Error('Output to src dir denied!')
+	}
+	writeFileSync(output, coffee.compile(codes.join(EOLEOL), coffeeOptions), charset)
+	callback()
+}
+
 function buildOneDir(info, callback, baseName) {
+	if(!checkCondition(info.condition)) {
+		callback()
+		return
+	}
 	baseName = baseName || ''
 	var inputDir = path.resolve(buildDir, info.input)
 	var outputDir = typeof info.output == 'undefined' ? inputDir : path.resolve(buildDir, outputBasePath, info.output, baseName)
 	var buildList = fs.readdirSync(inputDir)
-	var buildTotal = buildList.length
 	var ignore = info.ignore || {}
 	var buildNodeTpl = typeof info.buildNodeTpl != 'undefined' ? info.buildNodeTpl : globalBuildNodeTpl
 	var compressCss = typeof info.cssmin != 'undefined' ? info.cssmin : globalCssmin
@@ -492,74 +647,6 @@ function buildOneDir(info, callback, baseName) {
 	}
 }
 
-function getBuiltAmdModContent(input, info, opt) {
-	input = path.resolve(input)
-	opt = opt || {}
-	var inputDir = path.dirname(input)
-	var fileContent = []
-	var depId, deps, fileName, content
-	var reverseDepMap = utils.cloneObject(opt.reverseDepMap) || {}
-	if(reverseDepMap[input]) {
-		log('Warn: "' + input + '" have circular reference!')
-		return ''
-	}
-	reverseDepMap[input] = 1
-	content = fs.readFileSync(input, charset)
-	deps = traversalGetRelativeDeps(inputDir, content, info.exclude)
-	while(deps.length) {
-		depId = deps.shift()
-		if((/\.tpl\.html?$/).test(depId)) {
-			fileName = path.resolve(inputDir, depId)
-			if(reverseDepMap[fileName]) {
-				log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
-				continue
-			}
-			log('Merging: ' + fileName)
-			fileContent.push(fixDefineParams(compileTmpl(fileName, 'AMD', info, {id: depId, reverseDepMap: reverseDepMap}), depId, opt.id))
-		} else {
-			fileName = path.resolve(inputDir, depId + '.js')
-			if(reverseDepMap[fileName]) {
-				log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
-				continue
-			}
-			log('Merging: ' + fileName)
-			fileContent.push(fixDefineParams(fs.readFileSync(fileName, charset), depId, opt.id))
-		}
-	}
-	fileContent.push(fixDefineParams(content, opt.id))
-	return fileContent.join(EOLEOL)
-}
-
-function compileLess(input, callback) {
-	less.render(fs.readFileSync(input, charset), {
-		paths: [path.dirname(input)], // Specify search paths for @import directives
-		strictMaths: false,
-		strictUnits: false,
-		filename: input // Specify a filename, for better error messages
-	}, function(err, css) {
-		if(err) {
-			dealErr(JSON.stringify(err))
-		}
-		callback(css)
-	})
-}
-
-function checkCondition(condition) {
-	var type, tmp
-	if(!condition) {
-		return true
-	}
-	tmp = condition.split(/\s*:\s*/)
-	type = tmp[0]
-	condition = tmp[1]
-	if(type == 'property') {
-		with(properties || {}) {
-			return eval(condition)
-		}
-	}
-	return true
-}
-
 function buildOne(info, callback, allowSrcOutput) {
 	if(!checkCondition(info.condition)) {
 		callback()
@@ -573,10 +660,6 @@ function buildOne(info, callback, allowSrcOutput) {
 	var compressHtml = typeof info.compressHtml != 'undefined' ? info.compressHtml : globalCompressHtml
 	var compressHtmlOptions = typeof info.compressHtmlOptions != 'undefined' ? info.compressHtmlOptions : globalCompressHtmlOptions
 	var fileContent, nodeTplOutput
-	if(fs.statSync(input).isDirectory()) {//build dir
-		buildOneDir(info, callback)
-		return
-	}
 	if(input == output) {
 		printLine()
 		log('Build')
@@ -795,6 +878,7 @@ function init(options, callback) {
 	}
 	properties = utils.extendObject(options.properties, argProperties)
 	outputBasePath = utils.getDefinedItem([grunt.option('yomb-output-base-path'), options.outputBasePath, outputBasePath])
+	coffeeOptions = utils.getDefinedItem([options.coffeeOptions, coffeeOptions])
 	globalProtect = utils.getDefinedItem([grunt.option('yomb-protect'), options.protect, globalProtect])
 	globalAllowSrcOutput = utils.getDefinedItem([grunt.option('yomb-allow-src-output'), options.allowSrcOutput, globalAllowSrcOutput])
 	globalUglifyLevel = utils.getDefinedItem([grunt.option('yomb-uglify'), options.uglify, globalUglifyLevel])
@@ -823,14 +907,19 @@ function init(options, callback) {
 }
 
 module.exports = function(grunt) {
-	grunt.registerMultiTask('yomb', 'Your task description goes here.', function() {
+	grunt.registerMultiTask('yomb', 'YOM builder tasks.', function() {
 		var self = this
-		var buildList, combineList, copyList
+		var coffeeList, buildList, combineList, copyList
 		var options = this.options({})
 		var targetType = this.target.split('-')[0]
 		init(options, function() {
 			printLine('+')
-			if(targetType === 'build') {
+			if(targetType === 'coffee') {
+				log('Started at ' + grunt.template.today('yyyy-mm-dd HH:MM:ss'), 0, true)
+				done = self.async()
+				coffeeList = self.files || []
+				compileCoffee()
+			} else if(targetType === 'build') {
 				log('Started at ' + grunt.template.today('yyyy-mm-dd HH:MM:ss'), 0, true)
 				done = self.async()
 				buildList = self.files || []
@@ -847,6 +936,42 @@ module.exports = function(grunt) {
 				copy()
 			}
 		})
+
+		function compileCoffee() {
+			var file, input, output
+			if(coffeeList.length) {
+				file = coffeeList.shift()
+				if(file.src.length > 1) {
+					output = file.dest
+					if(output) {
+						compileOneCoffee(utils.extendObject(file, {inputs: file.src, output: output}, false, 0), function() {
+							compileCoffee()
+						})
+					} else {
+						compileCoffee()
+					}
+				} else if(file.src[0]) {
+					input = file.src[0]
+					output = file.dest
+					if(path.extname(input).toLowerCase() == '.coffee' && output && !path.extname(output)) {
+						output = path.join(output, input)
+					}
+					if(fs.statSync(input).isDirectory()) {
+						compileDirCoffee(utils.extendObject(file, {input: input, output: output}, false, 0), function() {
+							compileCoffee()
+						})
+					} else {
+						compileOneCoffee(utils.extendObject(file, {inputs: [input], output: output}, false, 0), function() {
+							compileCoffee()
+						})
+					}
+				} else {
+					compileCoffee()
+				}
+			} else {
+				exit(0)
+			}
+		}
 
 		function build() {
 			var file, input, output
@@ -875,12 +1000,18 @@ module.exports = function(grunt) {
 				} else if(file.src[0]) {
 					input = file.src[0]
 					output = file.dest
-					if(path.extname(input) && !path.extname(output)) {
+					if(path.extname(input) && output && !path.extname(output)) {
 						output = path.join(output, input)
 					}
-					buildOne(utils.extendObject(file, {input: input, output: output}, false, 0), function() {
-						build()
-					})
+					if(fs.statSync(input).isDirectory()) {
+						buildOneDir(utils.extendObject(file, {input: input, output: output}, false, 0), function() {
+							build()
+						})
+					} else {
+						buildOne(utils.extendObject(file, {input: input, output: output}, false, 0), function() {
+							build()
+						})
+					}
 				} else {
 					build()
 				}
