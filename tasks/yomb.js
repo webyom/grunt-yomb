@@ -520,11 +520,13 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 		callback()
 		return
 	}
-	var input, i
+	info.output = typeof info.output == 'undefined' ? inputs[0].replace(new RegExp(path.extname(inputs[0]) + '$'), '.js') : info.output
+	var input, i, result, outputFilename
 	var inputs = info.inputs
-	var output = path.resolve(buildDir, outputBasePath, typeof info.output == 'undefined' ? inputs[0].replace(new RegExp(path.extname(inputs[0]) + '$'), '.js') : info.output)
+	var output = path.resolve(buildDir, outputBasePath, info.output)
 	var outputDir = path.dirname(output)
 	var codes = []
+	var sources = []
 	for(i = 0; i < inputs.length; i++) {
 		input = path.resolve(buildDir, inputs[i])
 		if(input == output) {
@@ -541,6 +543,7 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 			return
 		}
 		codes.push(fs.readFileSync(input, charset))
+		sources.push(getUnixStylePath(path.join(path.relative(path.dirname(info.output), path.dirname(inputs[i])), path.basename(input))))
 	}
 	printLine()
 	log('Build')
@@ -549,7 +552,17 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 	if(!globalAllowSrcOutput && !allowSrcOutput && !isSrcDir(outputDir)) {
 		throw new Error('Output to src dir denied!')
 	}
-	writeFileSync(output, coffee.compile(codes.join(EOLEOL), coffeeOptions), charset)
+	outputFilename = path.basename(output)
+	coffeeOptions.filename = outputFilename
+	coffeeOptions.generatedFile = outputFilename
+	coffeeOptions.sourceFiles = sources
+	result = coffee.compile(codes.join(EOLEOL), coffeeOptions)
+	if(coffeeOptions.sourceMap) {
+		writeFileSync(output, result.js + EOL + '//@ sourceMappingURL=' + outputFilename + '.map', charset)
+		writeFileSync(output + '.map', result.v3SourceMap, charset)
+	} else {
+		writeFileSync(output, result, charset)
+	}
 	callback()
 }
 
