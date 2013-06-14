@@ -553,10 +553,11 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 		throw new Error('Output to src dir denied!')
 	}
 	outputFilename = path.basename(output)
-	coffeeOptions.filename = outputFilename
-	coffeeOptions.generatedFile = outputFilename
-	coffeeOptions.sourceFiles = sources
-	result = coffee.compile(codes.join(EOLEOL), coffeeOptions)
+	result = coffee.compile(codes.join(EOLEOL), utils.extendObject({
+		filename: outputFilename,
+		generatedFile: outputFilename,
+		sourceFiles: sources
+	}, coffeeOptions))
 	if(coffeeOptions.sourceMap) {
 		writeFileSync(output, result.js + EOL + '//@ sourceMappingURL=' + outputFilename + '.map', charset)
 		writeFileSync(output + '.map', result.v3SourceMap, charset)
