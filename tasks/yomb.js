@@ -214,7 +214,7 @@ function getTmplObjName(str) {
 	return tmplObjName
 }
 
-function getIncProcessed(input, info, opt) {
+function getIncProcessed(input, info, callback, opt) {
 	input = path.resolve(input)
 	opt = opt || {}
 	var inputDir = path.dirname(input)
@@ -222,6 +222,7 @@ function getIncProcessed(input, info, opt) {
 	var tmpl = opt.tmpl || fs.readFileSync(input, charset)
 	var compressCss = typeof info.cssmin != 'undefined' ? info.cssmin : globalCssmin
 	var reverseDepMap = utils.cloneObject(opt.reverseDepMap) || {}
+	var asyncQueue = []
 	var baseUrl, ugl
 	if(reverseDepMap[input]) {
 		log('Warn: "' + input + '" have circular reference!')
@@ -248,12 +249,35 @@ function getIncProcessed(input, info, opt) {
 		return ''
 	}).replace(/<!--\s*include\s+(['"])([^'"]+)\1(?:\s+plain-id:([\w-]+))?\s*-->/mg, function(full, quote, file, plainId) {
 		var res, extName
+		var asyncMark = '<YOMB_INC_PROCESS_ASYNC_MARK_' + asyncQueue.length + '>'
 		var ug = isNaN(ugl) ? info.uglify : ugl
 		file = path.join(inputDir, file)
 		extName = path.extname(file)
 		log('Merging: ' + file)
 		if((/\.(src|inc|tpl)\.html?$/).test(file)) {
-			res = getIncProcessed(file, info, {reverseDepMap: reverseDepMap, outputDir: outputDir})
+			res = asyncMark
+			asyncQueue.push({
+				mark: asyncMark,
+				processor: function(callback) {
+					getIncProcessed(file, info, function(res) {
+						callback(res)
+					}, {reverseDepMap: reverseDepMap, outputDir: outputDir})
+				}
+			})
+		} else if(extName == '.less') {
+			res = [
+				'<style type="text/css">',
+					asyncMark,
+				'</style>'
+			].join(EOL)
+			asyncQueue.push({
+				mark: asyncMark,
+				processor: function(callback) {
+					compileLess(file, function(css) {
+						callback(compressCss ? cssmin(css) : css)
+					})
+				}
+			})
 		} else {
 			res = fs.readFileSync(file, charset)
 			if(extName == '.js') {
@@ -273,107 +297,129 @@ function getIncProcessed(input, info, opt) {
 		return res
 	}).replace(/<!--\s*require\s+(['"])([^'"]+)\1(?:\s+plain-id:([\w-]+))?\s*-->/mg, function(full, quote, id, plainId) {
 		var file = path.join(inputDir, id).replace(/\.js$/, '') + '.js'
+		var asyncMark = '<YOMB_INC_PROCESS_ASYNC_MARK_' + asyncQueue.length + '>'
 		var ug = isNaN(ugl) ? info.uglify : ugl
 		id = getUnixStylePath(id.replace(/\.js$/, ''))
 		log('Merging: ' + file)
+		asyncQueue.push({
+			mark: asyncMark,
+			processor: function(callback) {
+				getBuiltAmdModContent(file, info, function(res) {
+					res = getUglified([
+						res,
+						(/\brequire-plugin\b/).test(id) ? 'require.processDefQueue()' : 'require.processDefQueue(\'\', ' + (baseUrl || 'require.PAGE_BASE_URL') + ', require.getBaseUrlConfig(' + (baseUrl || 'require.PAGE_BASE_URL') + '))'
+					].join(EOL), {uglify: ug}, {inline: true})
+					callback(res)
+				}, {id: id, reverseDepMap: reverseDepMap})
+			}
+		})
 		return [
 			plainId ? '<script type="text/plain" id="' + plainId + '">' : '<script type="text/javascript">',
-			getUglified([
-				getBuiltAmdModContent(file, info, {id: id, reverseDepMap: reverseDepMap}),
-				(/\brequire-plugin\b/).test(id) ? 'require.processDefQueue()' : 'require.processDefQueue(\'\', ' + (baseUrl || 'require.PAGE_BASE_URL') + ', require.getBaseUrlConfig(' + (baseUrl || 'require.PAGE_BASE_URL') + '))'
-			].join(EOL), {uglify: ug}, {inline: true}),
+				asyncMark,
 			'</script>'
 		].join(EOL)
-	}).replace(/(<script\b[^>]*>)([^\f]*?)(<\/script>)/mg, function(full, startTag, content, endTag) {
-		var eol, ug
-		startTag = startTag.replace(/\s+data-uglify=(['"])(\d+)\1/, function(full, quote, val) {
-			ug = parseInt(val)
-			return ''
-		})
-		content = content.replace(/^\s+$/, '')
-		eol = content ? EOL : ''
-		if(opt.tmpl && ug !== 0) {
-			//beautify micro template inline script
-			content = uglify.parse(content).print_to_string({beautify: true})
-		}
-		if(isNaN(parseInt(ug))) {
-			ug = isNaN(ugl) ? info.uglify : ugl
-		}
-		if(ug === 0) {
-			eol = ''
-		}
-		return startTag + eol + getUglified(content, {uglify: ug}, {inline: true}) + eol + endTag
 	})
-	if(info.lang) {
-		tmpl = lang.replaceProperties(tmpl, langResource[info.lang])
-	}
-	return tmpl.replace(/\r\n/g, '\n')
+	;(function mergeOne() {
+		var asyncItem = asyncQueue.shift()
+		if(asyncItem) {
+			asyncItem.processor(function(res) {
+				tmpl = tmpl.replace(new RegExp(asyncItem.mark, 'g'), res)
+				mergeOne()
+			})
+		} else {
+			tmpl = tmpl.replace(/(<script\b[^>]*>)([^\f]*?)(<\/script>)/mg, function(full, startTag, content, endTag) {
+				var eol, ug
+				startTag = startTag.replace(/\s+data-uglify=(['"])(\d+)\1/, function(full, quote, val) {
+					ug = parseInt(val)
+					return ''
+				})
+				content = content.replace(/^\s+$/, '')
+				eol = content ? EOL : ''
+				if(opt.tmpl && ug !== 0) {
+					//beautify micro template inline script
+					content = uglify.parse(content).print_to_string({beautify: true})
+				}
+				if(isNaN(parseInt(ug))) {
+					ug = isNaN(ugl) ? info.uglify : ugl
+				}
+				if(ug === 0) {
+					eol = ''
+				}
+				return startTag + eol + getUglified(content, {uglify: ug}, {inline: true}) + eol + endTag
+			})
+			if(info.lang) {
+				tmpl = lang.replaceProperties(tmpl, langResource[info.lang])
+			}
+			callback(tmpl.replace(/\r\n/g, '\n'))
+		}
+	})()
 }
 
-function compileTmpl(input, type, info, opt) {
+function compileTmpl(input, type, info, callback, opt) {
 	input = path.resolve(input)
 	opt = opt || {}
 	var tmpl = fs.readFileSync(input, charset)
 	var strict = (/\$data\b/).test(tmpl)
-	var res = []
-	tmpl = getIncProcessed(input, info, utils.extendObject(opt, {tmpl: tmpl}))
-	tmpl = tmpl.replace(/<\/script>/ig, '</s<%=""%>cript>')
-	if(type == 'NODE') {
-		//do nothing
-	} else if(type == 'AMD') {
+	getIncProcessed(input, info, function(processed) {
+		var res = []
+		tmpl = processed.replace(/<\/script>/ig, '</s<%=""%>cript>')
+		if(type == 'NODE') {
+			//do nothing
+		} else if(type == 'AMD') {
+			res.push([
+				opt.id ? 
+				"define('" + opt.id + "', ['require', 'exports', 'module'], function(require, exports, module) {" :
+				"define(function(require, exports, module) {"
+			].join(EOL))
+		} else {
+			res.push([
+				"var " + getTmplObjName(opt.id) + " = (function() {",
+				"	var exports = {}"
+			].join(EOL))
+		}
 		res.push([
-			opt.id ? 
-			"define('" + opt.id + "', ['require', 'exports', 'module'], function(require, exports, module) {" :
-			"define(function(require, exports, module) {"
-		].join(EOL))
-	} else {
-		res.push([
-			"var " + getTmplObjName(opt.id) + " = (function() {",
-			"	var exports = {}"
-		].join(EOL))
-	}
-	res.push([
-		"	function $encodeHtml(str) {",
-		"		return (str + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\x60/g, '&#96;').replace(/\x27/g, '&#39;').replace(/\x22/g, '&quot;')",
-		"	}",
-		"	exports.render = function($data, $opt) {",
-		"		$data = $data || {}",
-		"		var _$out_= []",
-		"		var $print = function(str) {_$out_.push(str)}",
-		"		" + (strict ? "" : "with($data) {"),
-		"		_$out_.push('" + tmpl
-				.replace(/\r\n|\n|\r/g, "\v")
-				.replace(/(?:^|%>).*?(?:<%|$)/g, function($0) {
-					var uglifyLevel = typeof info.uglify != 'undefined' ? info.uglify : globalUglifyLevel
-					if(type == 'NODE' && uglifyLevel <= 0) {
-						return $0.replace(/('|\\)/g, "\\$1").replace(/[\v]/g, '\\n')
-					} else {
-						return $0.replace(/('|\\)/g, "\\$1").replace(/[\v\t]/g, "").replace(/\s+/g, " ")
-					}
-				})
-				.replace(/[\v]/g, EOL)
-				.replace(/<%==(.*?)%>/g, "', $encodeHtml($1), '")
-				.replace(/<%=(.*?)%>/g, "', $1, '")
-				.replace(/<%(<-)?/g, "')" + EOL + "		")
-				.replace(/->(\w+)%>/g, EOL + "		$1.push('")
-				.split("%>").join(EOL + "		_$out_.push('") + "')",
-		"		" + (strict ? "" : "}"),
-		"		return _$out_.join('')",
-		"	}"
-	].join(EOL).replace(/_\$out_\.push\(''\)/g, ''))
-	if(type == 'NODE') {
-		//do nothing
-	} else if(type == 'AMD') {
-		res.push([
-			"})"
-		].join(EOL))
-	} else {
-		res.push([
-			"	return exports",
-			"})()"
-		].join(EOL))
-	}
-	return uglify.parse(res.join(EOL)).print_to_string({beautify: true})
+			"	function $encodeHtml(str) {",
+			"		return (str + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\x60/g, '&#96;').replace(/\x27/g, '&#39;').replace(/\x22/g, '&quot;')",
+			"	}",
+			"	exports.render = function($data, $opt) {",
+			"		$data = $data || {}",
+			"		var _$out_= []",
+			"		var $print = function(str) {_$out_.push(str)}",
+			"		" + (strict ? "" : "with($data) {"),
+			"		_$out_.push('" + tmpl
+					.replace(/\r\n|\n|\r/g, "\v")
+					.replace(/(?:^|%>).*?(?:<%|$)/g, function($0) {
+						var uglifyLevel = typeof info.uglify != 'undefined' ? info.uglify : globalUglifyLevel
+						if(type == 'NODE' && uglifyLevel <= 0) {
+							return $0.replace(/('|\\)/g, "\\$1").replace(/[\v]/g, '\\n')
+						} else {
+							return $0.replace(/('|\\)/g, "\\$1").replace(/[\v\t]/g, "").replace(/\s+/g, " ")
+						}
+					})
+					.replace(/[\v]/g, EOL)
+					.replace(/<%==(.*?)%>/g, "', $encodeHtml($1), '")
+					.replace(/<%=(.*?)%>/g, "', $1, '")
+					.replace(/<%(<-)?/g, "')" + EOL + "		")
+					.replace(/->(\w+)%>/g, EOL + "		$1.push('")
+					.split("%>").join(EOL + "		_$out_.push('") + "')",
+			"		" + (strict ? "" : "}"),
+			"		return _$out_.join('')",
+			"	}"
+		].join(EOL).replace(/_\$out_\.push\(''\)/g, ''))
+		if(type == 'NODE') {
+			//do nothing
+		} else if(type == 'AMD') {
+			res.push([
+				"})"
+			].join(EOL))
+		} else {
+			res.push([
+				"	return exports",
+				"})()"
+			].join(EOL))
+		}
+		callback(uglify.parse(res.join(EOL)).print_to_string({beautify: true}))
+	}, utils.extendObject(opt, {tmpl: tmpl}))
 }
 
 function fixDefineParams(def, depId, baseId) {
@@ -403,12 +449,12 @@ function fixDefineParams(def, depId, baseId) {
 	return def
 }
 
-function getBuiltAmdModContent(input, info, opt) {
+function getBuiltAmdModContent(input, info, callback, opt) {
 	input = path.resolve(input)
 	opt = opt || {}
 	var inputDir = path.dirname(input)
 	var fileContent = []
-	var depId, deps, fileName, content
+	var deps, fileName, content
 	var reverseDepMap = utils.cloneObject(opt.reverseDepMap) || {}
 	if(reverseDepMap[input]) {
 		log('Warn: "' + input + '" have circular reference!')
@@ -417,28 +463,37 @@ function getBuiltAmdModContent(input, info, opt) {
 	reverseDepMap[input] = 1
 	content = fs.readFileSync(input, charset)
 	deps = traversalGetRelativeDeps(inputDir, content, info.exclude)
-	while(deps.length) {
-		depId = deps.shift()
-		if((/\.tpl\.html?$/).test(depId)) {
-			fileName = path.resolve(inputDir, depId)
-			if(reverseDepMap[fileName]) {
-				log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
-				continue
+	;(function mergeOne() {
+		var depId = deps.shift()
+		if(depId) {
+			if((/\.tpl\.html?$/).test(depId)) {
+				fileName = path.resolve(inputDir, depId)
+				if(reverseDepMap[fileName]) {
+					log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
+					mergeOne()
+					return
+				}
+				log('Merging: ' + fileName)
+				compileTmpl(fileName, 'AMD', info, function(res) {
+					fileContent.push(fixDefineParams(res, depId, opt.id))
+					mergeOne()
+				}, {id: depId, reverseDepMap: reverseDepMap})
+			} else {
+				fileName = path.resolve(inputDir, depId + '.js')
+				if(reverseDepMap[fileName]) {
+					log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
+					mergeOne()
+					return
+				}
+				log('Merging: ' + fileName)
+				fileContent.push(fixDefineParams(fs.readFileSync(fileName, charset), depId, opt.id))
+				mergeOne()
 			}
-			log('Merging: ' + fileName)
-			fileContent.push(fixDefineParams(compileTmpl(fileName, 'AMD', info, {id: depId, reverseDepMap: reverseDepMap}), depId, opt.id))
 		} else {
-			fileName = path.resolve(inputDir, depId + '.js')
-			if(reverseDepMap[fileName]) {
-				log('Warn: "' + fileName + '" and "' + input + '" have circular reference!')
-				continue
-			}
-			log('Merging: ' + fileName)
-			fileContent.push(fixDefineParams(fs.readFileSync(fileName, charset), depId, opt.id))
+			fileContent.push(fixDefineParams(content, opt.id))
+			callback(fileContent.join(EOLEOL))
 		}
-	}
-	fileContent.push(fixDefineParams(content, opt.id))
-	return fileContent.join(EOLEOL)
+	})()
 }
 
 function compileLess(input, callback) {
@@ -673,7 +728,7 @@ function buildOne(info, callback, allowSrcOutput) {
 	var compressCss = typeof info.cssmin != 'undefined' ? info.cssmin : globalCssmin
 	var compressHtml = typeof info.compressHtml != 'undefined' ? info.compressHtml : globalCompressHtml
 	var compressHtmlOptions = typeof info.compressHtmlOptions != 'undefined' ? info.compressHtmlOptions : globalCompressHtmlOptions
-	var fileContent, nodeTplOutput
+	var nodeTplOutput
 	if(input == output) {
 		printLine()
 		log('Build')
@@ -703,36 +758,44 @@ function buildOne(info, callback, allowSrcOutput) {
 			log('Output: ' + nodeTplOutput)
 		}
 		log('Merging: ' + output)
-		fileContent = getUglified(compileTmpl(input, 'AMD', info), info)
-		log('Writing: ' + output)
-		writeFileSync(output, fileContent, charset)
-		if(buildNodeTpl) {
-			log('Merging: ' + nodeTplOutput)
-			fileContent = getUglified(compileTmpl(input, 'NODE', info), info)
-			log('Writing: ' + nodeTplOutput)
-			writeFileSync(nodeTplOutput, fileContent, charset)
-		}
-		log('Done!')
-		callback()
-	} else if((/\.src\.html?$/).test(input)) {
-		log('Merging: ' + input)
-		fileContent = getIncProcessed(input, info, {outputDir: outputDir})
-		log('Writing: ' + output)
-		writeFileSync(output, fileContent, charset, info.lang)
-		if(compressHtml) {
-			exec('java -jar ' + htmlCompressorPath + ' ' + compressHtmlOptions + ' ' + output, function(err, stdout, stderr) {
-				if(err) {
-					throw err
-				} else {
-					writeFileSync(output, stdout, charset)
+		compileTmpl(input, 'AMD', info, function(res) {
+			res = getUglified(res, info)
+			log('Writing: ' + output)
+			writeFileSync(output, res, charset)
+			if(buildNodeTpl) {
+				log('Merging: ' + nodeTplOutput)
+				compileTmpl(input, 'NODE', info, function(res) {
+					res = getUglified(res, info)
+					log('Writing: ' + nodeTplOutput)
+					writeFileSync(nodeTplOutput, res, charset)
 					log('Done!')
 					callback()
-				}
-			})
-		} else {
-			log('Done!')
-			callback()
-		}
+				})
+			} else {
+				log('Done!')
+				callback()
+			}
+		})
+	} else if((/\.src\.html?$/).test(input)) {
+		log('Merging: ' + input)
+		getIncProcessed(input, info, function(res) {
+			log('Writing: ' + output)
+			writeFileSync(output, res, charset, info.lang)
+			if(compressHtml) {
+				exec('java -jar ' + htmlCompressorPath + ' ' + compressHtmlOptions + ' ' + output, function(err, stdout, stderr) {
+					if(err) {
+						throw err
+					} else {
+						writeFileSync(output, stdout, charset)
+						log('Done!')
+						callback()
+					}
+				})
+			} else {
+				log('Done!')
+				callback()
+			}
+		}, {outputDir: outputDir})
 	} else if(path.extname(input) == '.less') {
 		log('Merging: ' + input)
 		compileLess(input, function(css) {
@@ -746,11 +809,13 @@ function buildOne(info, callback, allowSrcOutput) {
 		})
 	} else {
 		log('Merging: ' + input)
-		fileContent = getUglified(getBuiltAmdModContent(input, info), info)
-		log('Writing: ' + output)
-		writeFileSync(output, fileContent, charset)
-		log('Done!')
-		callback()
+		getBuiltAmdModContent(input, info, function(res) {
+			res = getUglified(res, info)
+			log('Writing: ' + output)
+			writeFileSync(output, res, charset)
+			log('Done!')
+			callback()
+		})
 	}
 }
 
@@ -784,8 +849,10 @@ function combineOne(info, callback) {
 			fileName = path.resolve(buildDir, depId)
 			log('Merging: ' + fileName)
 			if((/\.tpl\.html?$/).test(depId)) {
-				fileContent.push(compileTmpl(fileName, 'NONE_AMD', info, {id: depId}))
-				combineNext()
+				compileTmpl(fileName, 'NONE_AMD', info, function(res) {
+					fileContent.push(res)
+					combineNext()
+				}, {id: depId})
 			} else if(path.extname(fileName) == '.less' && path.extname(output) == '.css') {
 				compileLess(fileName, function(css) {
 					fileContent.push(css)
