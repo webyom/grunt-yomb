@@ -907,7 +907,7 @@ function copyOne(info, callback, _deep) {
 		return
 	}
 	if(fs.statSync(input).isDirectory()) {
-		if(_deep && fileName == 'node_modules') {
+		if(_deep && (fileName == 'node_modules' || (/^\.[^\/\\]+/).test(fileName))) {
 			callback()
 			return
 		}
