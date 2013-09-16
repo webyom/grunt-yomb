@@ -158,11 +158,20 @@ function getUglified(content, info, opt) {
 function getBodyDeps(def) {
 	var deps = []
 	var got = {}
-	def.replace(/(?:^|[^\.\/\w])require\s*\(\s*(["'])([^"']+?)\1\s*\)/mg, function(full, quote, dep) {
-		got[dep] || deps.push(dep)
+	def = def.replace(/(^|[^\.\/\w])require\s*\(\s*(["'])([^"']+?)\2\s*\)/mg, function(full, lead, quote, dep) {
+		var pDep = dep.replace(/\{\{([^{}]+)\}\}/g, "' + $1 + '")
+		got[dep] || deps.push(pDep)
 		got[dep] = 1
+		if(pDep == dep) {
+			return full
+		} else {
+			return lead + 'require(' + quote + pDep + quote + ')'
+		}
 	})
-	return deps
+	return {
+		def: def,
+		deps: deps
+	}
 }
 
 function getRelativeDeps(def, exclude) {
@@ -362,13 +371,21 @@ function compileTmpl(input, type, info, callback, opt) {
 	var strict = (/\$data\b/).test(tmpl)
 	getIncProcessed(input, info, function(processed) {
 		var res = []
+		var depPaths = ["'require'", "'exports'", "'module'"]
+		var depSymbols = ['require', 'exports', 'module']
+		var i
 		tmpl = processed.replace(/<\/script>/ig, '</s<%=""%>cript>')
+			.replace(/#require\s+(['"])([^'"]+)\1\s*->\s*([a-zA-Z_]\w*)/g, function(all, quote, path, symbol) {
+				depPaths.push("'" + path.replace(/\{\{([^{}]+)\}\}/g, "' + $1 + '") + "'")
+				depSymbols.push(symbol)
+				return ''
+			})
 		if(type == 'NODE') {
 			//do nothing
 		} else if(type == 'AMD') {
 			res.push([
 				opt.id ? 
-				"define('" + opt.id + "', ['require', 'exports', 'module'], function(require, exports, module) {" :
+				"define('" + opt.id + "', [" + depPaths.join(', ') + "], function(" + depSymbols.join(', ') + ") {" :
 				"define(function(require, exports, module) {"
 			].join(EOL))
 		} else {
@@ -376,6 +393,9 @@ function compileTmpl(input, type, info, callback, opt) {
 				"var " + getTmplObjName(opt.id) + " = (function() {",
 				"	var exports = {}"
 			].join(EOL))
+			for(i = 3; i < depPaths.length; i++) {
+				res.push("var " + depSymbols[i] + " = require(" + depPaths[i] + ")")
+			}
 		}
 		res.push([
 			"	function $encodeHtml(str) {",
@@ -424,8 +444,9 @@ function compileTmpl(input, type, info, callback, opt) {
 
 function fixDefineParams(def, depId, baseId) {
 	var bodyDeps
-	bodyDeps = getBodyDeps(def)
-	def = def.replace(/\b(define\s*\()\s*(?:(["'])([^"'\s]+)\2\s*,\s*)?\s*(\[[^\[\]]*\])?/m, function(full, d, quote, definedId, deps) {
+	def = getBodyDeps(def)
+	bodyDeps = def.deps
+	def = def.def.replace(/\b(define\s*\()\s*(?:(["'])([^"'\s]+)\2\s*,\s*)?\s*(\[[^\[\]]*\])?/m, function(full, d, quote, definedId, deps) {
 		var id
 		if(bodyDeps.length) {
 			bodyDeps = "'" + bodyDeps.join("', '") + "'"
