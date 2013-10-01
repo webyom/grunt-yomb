@@ -375,11 +375,6 @@ function compileTmpl(input, type, info, callback, opt) {
 		var depSymbols = ['require', 'exports', 'module']
 		var i
 		tmpl = processed.replace(/<\/script>/ig, '</s<%=""%>cript>')
-			.replace(/#require\s+(['"])([^'"]+)\1\s*->\s*([a-zA-Z_]\w*)/g, function(all, quote, path, symbol) {
-				depPaths.push("'" + path.replace(/\{\{([^{}]+)\}\}/g, "' + $1 + '") + "'")
-				depSymbols.push(symbol)
-				return ''
-			})
 		if(type == 'NODE') {
 			//do nothing
 		} else if(type == 'AMD') {
@@ -393,9 +388,6 @@ function compileTmpl(input, type, info, callback, opt) {
 				"var " + getTmplObjName(opt.id) + " = (function() {",
 				"	var exports = {}"
 			].join(EOL))
-			for(i = 3; i < depPaths.length; i++) {
-				res.push("var " + depSymbols[i] + " = require(" + depPaths[i] + ")")
-			}
 		}
 		res.push([
 			"	function $encodeHtml(str) {",
@@ -438,7 +430,11 @@ function compileTmpl(input, type, info, callback, opt) {
 				"})()"
 			].join(EOL))
 		}
-		callback(uglify.parse(res.join(EOL)).print_to_string({beautify: true}))
+		res = res.join(EOL)
+		if(type == 'AMD') {
+			res = fixDefineParams(res, opt.id, opt.baseId)
+		}
+		callback(uglify.parse(res).print_to_string({beautify: true}))
 	}, utils.extendObject(opt, {tmpl: tmpl}))
 }
 
@@ -496,9 +492,9 @@ function getBuiltAmdModContent(input, info, callback, opt) {
 				}
 				log('Merging: ' + fileName)
 				compileTmpl(fileName, 'AMD', info, function(res) {
-					fileContent.push(fixDefineParams(res, depId, opt.id))
+					fileContent.push(res)
 					mergeOne()
-				}, {id: depId, reverseDepMap: reverseDepMap})
+				}, {id: depId, baseId: opt.id, reverseDepMap: reverseDepMap})
 			} else {
 				fileName = path.resolve(inputDir, depId + '.js')
 				if(reverseDepMap[fileName]) {
@@ -873,7 +869,7 @@ function combineOne(info, callback) {
 				compileTmpl(fileName, 'NONE_AMD', info, function(res) {
 					fileContent.push(res)
 					combineNext()
-				}, {id: depId})
+				})
 			} else if(path.extname(fileName) == '.less' && path.extname(output) == '.css') {
 				compileLess(fileName, function(css) {
 					fileContent.push(css)
