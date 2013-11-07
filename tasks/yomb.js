@@ -359,6 +359,9 @@ function getIncProcessed(input, info, callback, opt) {
 			if(info.lang) {
 				tmpl = lang.replaceProperties(tmpl, langResource[info.lang])
 			}
+			if((/\.tpl\.html?$/).test(input)) {
+				tmpl = ['<%;(function() {%>', tmpl, '<%})();%>'].join(EOL)
+			}
 			callback(tmpl.replace(/\r\n/g, '\n'))
 		}
 	})()
