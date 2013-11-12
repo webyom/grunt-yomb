@@ -329,6 +329,7 @@ function getIncProcessed(input, info, callback, opt) {
 		].join(EOL)
 	})
 	;(function mergeOne() {
+		var strict
 		var asyncItem = asyncQueue.shift()
 		if(asyncItem) {
 			asyncItem.processor(function(res) {
@@ -360,7 +361,8 @@ function getIncProcessed(input, info, callback, opt) {
 				tmpl = lang.replaceProperties(tmpl, langResource[info.lang])
 			}
 			if((/\.tpl\.html?$/).test(input)) {
-				tmpl = ['<%;(function() {%>', tmpl, '<%})();%>'].join(EOL)
+				strict = (/\b\$data\b/).test(tmpl)
+				tmpl = ['<%;(function() {%>', strict ? '' : '<%with($data) {%>', tmpl, strict ? '' : '<%}%>', '<%})();%>'].join(EOL)
 			}
 			callback(tmpl.replace(/\r\n/g, '\n'))
 		}
@@ -371,7 +373,6 @@ function compileTmpl(input, type, info, callback, opt) {
 	input = path.resolve(input)
 	opt = opt || {}
 	var tmpl = fs.readFileSync(input, charset)
-	var strict = (/\$data\b/).test(tmpl)
 	getIncProcessed(input, info, function(processed) {
 		var res = []
 		var depPaths = ["'require'", "'exports'", "'module'"]
@@ -400,7 +401,6 @@ function compileTmpl(input, type, info, callback, opt) {
 			"		$data = $data || {}",
 			"		var _$out_= []",
 			"		var $print = function(str) {_$out_.push(str)}",
-			"		" + (strict ? "" : "with($data) {"),
 			"		_$out_.push('" + tmpl
 					.replace(/\r\n|\n|\r/g, "\v")
 					.replace(/(?:^|%>).*?(?:<%|$)/g, function($0) {
@@ -417,7 +417,6 @@ function compileTmpl(input, type, info, callback, opt) {
 					.replace(/<%(<-)?/g, "')" + EOL + "		")
 					.replace(/->(\w+)%>/g, EOL + "		$1.push('")
 					.split("%>").join(EOL + "		_$out_.push('") + "')",
-			"		" + (strict ? "" : "}"),
 			"		return _$out_.join('')",
 			"	}"
 		].join(EOL).replace(/_\$out_\.push\(''\)/g, ''))
