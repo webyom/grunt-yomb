@@ -181,11 +181,11 @@ function getRelativeDeps(def, exclude) {
 	depArr = depArr && depArr[1]
 	exclude = exclude || {}
 	depArr && depArr.replace(/(["'])(\.[^"']+?)\1/mg, function(full, quote, dep) {
-		got[dep] || exclude[dep] || globalExclude[dep] || (/(-built|\.js)$/).test(dep) || deps.push(dep)
+		got[dep] || exclude[dep] || globalExclude[dep] || deps.push(dep)
 		got[dep] = 1
 	})
 	def.replace(/(?:^|[^\.\/\w])require\s*\(\s*(["'])(\.[^"']+?)\1\s*\)/mg, function(full, quote, dep) {
-		got[dep] || exclude[dep] || globalExclude[dep] || (/(-built|\.js)$/).test(dep) || deps.push(dep)
+		got[dep] || exclude[dep] || globalExclude[dep] || deps.push(dep)
 		got[dep] = 1
 	})
 	return deps
@@ -383,7 +383,7 @@ function compileTmpl(input, type, info, callback, opt) {
 			//do nothing
 		} else if(type == 'AMD') {
 			res.push([
-				opt.id ? 
+				opt.id ?
 				"define('" + opt.id + "', [" + depPaths.join(', ') + "], function(" + depSymbols.join(', ') + ") {" :
 				"define(function(require, exports, module) {"
 			].join(EOL))
@@ -669,8 +669,11 @@ function buildOneDir(info, callback, baseName) {
 			if(ignore[inputFile] || (/^\.|~$/).test(path.basename(inputFile))) {
 				build()
 			} else if(path.basename(inputFile) == 'main.js' || (/-main\.js$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.js') {
-				fileName = path.basename(inputFile).replace(/\.js$/, '-built.js')
+				fileName = path.basename(inputFile)
 				outputFile = path.join(outputDir, fileName)
+				if(inputFile == outputFile) {
+					outputFile = outputFile.replace(/\.js$/, '-built.js')
+				}
 				buildOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
 					build()
 				}, true)
