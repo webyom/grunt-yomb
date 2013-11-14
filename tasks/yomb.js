@@ -191,12 +191,18 @@ function getRelativeDeps(def, exclude) {
 	return deps
 }
 
-function traversalGetRelativeDeps(inputDir, def, exclude, processed, curDir) {
+function traversalGetRelativeDeps(inputDir, inputId, def, exclude, processed, curDir) {
 	var deps = getRelativeDeps(def, exclude)
 	var res = []
 	var depId, fileName
-	processed = processed || {}
 	curDir = curDir || inputDir
+	if(!processed) {
+		if(!(/^\./).test(inputId)) {
+			inputId = './' + inputId
+		}
+		processed = {}
+		processed[inputId] = 1
+	}
 	while(deps.length) {
 		depId = path.join(path.relative(inputDir, curDir), deps.shift()).split(path.sep).join('/')
 		if(!(/^\./).test(depId)) {
@@ -208,11 +214,13 @@ function traversalGetRelativeDeps(inputDir, def, exclude, processed, curDir) {
 			res.push(depId)
 			processed[depId] = 1
 		}
-		if(!(/\.tpl\.html?$/).test(depId)) {
+		if((/\.tpl\.html?$/).test(depId)) {
+			fileName = path.resolve(curDir, depId)
+		} else {
 			fileName = path.resolve(curDir, depId + '.js')
-			def = fs.readFileSync(fileName, charset)
-			res = traversalGetRelativeDeps(inputDir, def, exclude, processed, path.dirname(fileName)).concat(res)
 		}
+		def = fs.readFileSync(fileName, charset)
+		res = traversalGetRelativeDeps(inputDir, depId, def, exclude, processed, path.dirname(fileName)).concat(res)
 	}
 	return res
 }
@@ -390,17 +398,17 @@ function compileTmpl(input, type, info, callback, opt) {
 		} else {
 			res.push([
 				"var " + getTmplObjName(opt.id) + " = (function() {",
-				"	var exports = {}"
+				"	var exports = {};"
 			].join(EOL))
 		}
 		res.push([
 			"	function $encodeHtml(str) {",
-			"		return (str + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\x60/g, '&#96;').replace(/\x27/g, '&#39;').replace(/\x22/g, '&quot;')",
+			"		return (str + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\x60/g, '&#96;').replace(/\x27/g, '&#39;').replace(/\x22/g, '&quot;');",
 			"	}",
 			"	exports.render = function($data, $opt) {",
-			"		$data = $data || {}",
-			"		var _$out_= []",
-			"		var $print = function(str) {_$out_.push(str)}",
+			"		$data = $data || {};",
+			"		var _$out_= [];",
+			"		var $print = function(str) {_$out_.push(str);};",
 			"		_$out_.push('" + tmpl
 					.replace(/\r\n|\n|\r/g, "\v")
 					.replace(/(?:^|%>).*?(?:<%|$)/g, function($0) {
@@ -414,12 +422,12 @@ function compileTmpl(input, type, info, callback, opt) {
 					.replace(/[\v]/g, EOL)
 					.replace(/<%==(.*?)%>/g, "', $encodeHtml($1), '")
 					.replace(/<%=(.*?)%>/g, "', $1, '")
-					.replace(/<%(<-)?/g, "')" + EOL + "		")
+					.replace(/<%(<-)?/g, "');" + EOL + "		")
 					.replace(/->(\w+)%>/g, EOL + "		$1.push('")
-					.split("%>").join(EOL + "		_$out_.push('") + "')",
-			"		return _$out_.join('')",
-			"	}"
-		].join(EOL).replace(/_\$out_\.push\(''\)/g, ''))
+					.split("%>").join(EOL + "		_$out_.push('") + "');",
+			"		return _$out_.join('');",
+			"	};"
+		].join(EOL).replace(/_\$out_\.push\(''\);/g, ''))
 		if(type == 'NODE') {
 			//do nothing
 		} else if(type == 'AMD') {
@@ -481,7 +489,7 @@ function getBuiltAmdModContent(input, info, callback, opt) {
 	}
 	reverseDepMap[input] = 1
 	content = fs.readFileSync(input, charset)
-	deps = traversalGetRelativeDeps(inputDir, content, info.exclude)
+	deps = traversalGetRelativeDeps(inputDir, path.basename(input), content, info.exclude)
 	;(function mergeOne() {
 		var depId = deps.shift()
 		if(depId) {
