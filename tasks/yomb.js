@@ -441,10 +441,16 @@ function compileTmpl(input, type, info, callback, opt) {
 			].join(EOL))
 		}
 		res = res.join(EOL)
-		if(type == 'AMD') {
-			res = fixDefineParams(res, opt.id, opt.baseId)
+		if(opt.buildRoot && type == 'AMD') {
+			getBuiltAmdModContent(input, info, function(res) {
+				callback(uglify.parse(res).print_to_string({beautify: true}))
+			}, {content: res})
+		} else {
+			if(type == 'AMD') {
+				res = fixDefineParams(res, opt.id, opt.baseId)
+			}
+			callback(uglify.parse(res).print_to_string({beautify: true}))
 		}
-		callback(uglify.parse(res).print_to_string({beautify: true}))
 	}, utils.extendObject(opt, {tmpl: tmpl}))
 }
 
@@ -488,7 +494,7 @@ function getBuiltAmdModContent(input, info, callback, opt) {
 		return ''
 	}
 	reverseDepMap[input] = 1
-	content = fs.readFileSync(input, charset)
+	content = opt.content || fs.readFileSync(input, charset)
 	deps = traversalGetRelativeDeps(inputDir, path.basename(input), content, info.exclude)
 	;(function mergeOne() {
 		var depId = deps.shift()
@@ -805,7 +811,7 @@ function buildOne(info, callback, allowSrcOutput) {
 				log('Done!')
 				callback()
 			}
-		})
+		}, {buildRoot: true})
 	} else if((/\.src\.html?$/).test(input)) {
 		log('Merging: ' + input)
 		getIncProcessed(input, info, function(res) {
