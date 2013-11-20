@@ -21,6 +21,9 @@ var replaceProperties = require('./lib/properties').replaceProperties
 
 process.on('uncaughtException', function(err) {
 	try {
+		if(err.filename) {//print less file
+			log('Failed to build file: ' + err.filename, 1)
+		}
 		dealErr(err)
 	} catch(e) {
 	}
@@ -71,12 +74,19 @@ function exit(code, type) {
 function log(content, err, verbose) {
 	logs.push(content)
 	if(err || verbose || grunt.option('yomb-verbose')) {
-		grunt.log.writeln(content)
+		if(err) {
+			grunt.log.error(content)
+		} else {
+			grunt.log.writeln(content)
+		}
 	}
 }
 
 function dealErr(err) {
 	var content = err.toString()
+	if(content == '[object Object]') {
+		content = err.message || ''
+	}
 	logs.push(content)
 	exit(1, 'error')
 	grunt.fail.warn(err)
@@ -131,6 +141,31 @@ function isSrcDir(outputDir) {
 	return true
 }
 
+function uglifyParse(content) {
+	var res
+	try {
+		res = uglify.parse(content)
+	} catch(e) {
+		var startLine = Math.max(1, e.line - 2)
+		var maxLineNoLen = 0
+		content = content.split(/\n|\r\n|\r/).slice(startLine - 1, e.line + 2)
+		content.forEach(function(line, i) {
+			var lineNo = (startLine + i + 87) + (startLine + i == e.line ? ' ->' : '   ')  +  '| '
+			maxLineNoLen = Math.max(maxLineNoLen, lineNo.length)
+			content[i] = lineNo + line
+		})
+		content.forEach(function(line, i) {
+			if(line.split('|')[0].length + 2 < maxLineNoLen) {
+				content[i] = ' ' + line
+			}
+		})
+		console.log(content.length);
+		log('Failed to uglify JS content at line ' + e.line + ': ' + EOL + content.join(EOL), 1)
+		dealErr(e)
+	}
+	return res
+}
+
 function getUglified(content, info, opt) {
 	opt = opt || {}
 	var ast
@@ -144,7 +179,7 @@ function getUglified(content, info, opt) {
 	} else {
 		content = replaceProperties(content, properties)
 	}
-	ast = uglify.parse(content)
+	ast = uglifyParse(content)
 	if(level > 0) {
 		ast.figure_out_scope()
 		ast = ast.transform(uglify.Compressor({warnings: false}))
@@ -355,7 +390,7 @@ function getIncProcessed(input, info, callback, opt) {
 				eol = content ? EOL : ''
 				if(opt.tmpl && ug !== 0) {
 					//beautify micro template inline script
-					content = uglify.parse(content).print_to_string({beautify: true})
+					content = uglifyParse(content).print_to_string({beautify: true})
 				}
 				if(isNaN(parseInt(ug))) {
 					ug = isNaN(ugl) ? info.uglify : ugl
@@ -443,13 +478,13 @@ function compileTmpl(input, type, info, callback, opt) {
 		res = res.join(EOL)
 		if(opt.buildRoot && type == 'AMD') {
 			getBuiltAmdModContent(input, info, function(res) {
-				callback(uglify.parse(res).print_to_string({beautify: true}))
+				callback(uglifyParse(res).print_to_string({beautify: true}))
 			}, {content: res})
 		} else {
 			if(type == 'AMD') {
 				res = fixDefineParams(res, opt.id, opt.baseId)
 			}
-			callback(uglify.parse(res).print_to_string({beautify: true}))
+			callback(uglifyParse(res).print_to_string({beautify: true}))
 		}
 	}, utils.extendObject(opt, {tmpl: tmpl}))
 }
@@ -608,7 +643,7 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 		callback()
 		return
 	}
-	info.output = typeof info.output == 'undefined' ? inputs[0].replace(new RegExp(path.extname(inputs[0]) + '$'), '.js') : info.output
+	info.output = typeof info.output == 'undefined' ? info.inputs[0].replace(new RegExp(path.extname(info.inputs[0]) + '$'), '.js') : info.output
 	var input, i, result, outputFilename
 	var inputs = info.inputs
 	var output = path.resolve(buildDir, outputBasePath, info.output)
@@ -641,11 +676,16 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 		throw new Error('Output to src dir denied!')
 	}
 	outputFilename = path.basename(output)
-	result = coffee.compile(codes.join(EOLEOL), utils.extendObject({
-		filename: outputFilename,
-		generatedFile: outputFilename,
-		sourceFiles: sources
-	}, coffeeOptions))
+	try {
+		result = coffee.compile(codes.join(EOLEOL), utils.extendObject({
+			filename: outputFilename,
+			generatedFile: outputFilename,
+			sourceFiles: sources
+		}, coffeeOptions))
+	} catch(e) {
+		log('Failed to compile coffee script: ' + inputs.join(', '), 1)
+		dealErr(e)
+	}
 	if(coffeeOptions.sourceMap) {
 		writeFileSync(output, result.js + EOL + '//@ sourceMappingURL=' + outputFilename + '.map', charset)
 		writeFileSync(output + '.map', result.v3SourceMap, charset)
