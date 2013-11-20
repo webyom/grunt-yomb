@@ -934,7 +934,8 @@ function copyOne(info, callback, _deep) {
 		return
 	}
 	var fileName = path.basename(info.input)
-	var filterRegexp = info.regexp
+	var includeRegexp = info.includeRegexp
+	var excludeRegexp = info.excludeRegexp
 	var input = path.resolve(buildDir, info.input)
 	var output = path.resolve(buildDir, outputBasePath, info.output)
 	var outputDir = path.dirname(output)
@@ -975,7 +976,7 @@ function copyOne(info, callback, _deep) {
 			fileName = copyList.shift()
 			inputFile = path.resolve(input, fileName)
 			outputFile = path.resolve(output, path.basename(inputFile))
-			if(filterRegexp && !new RegExp(filterRegexp).test(fileName) && !fs.statSync(inputFile).isDirectory() || inputFile == output || path.relative(output, inputFile).indexOf('..') != 0 || path.relative(inputFile, output).indexOf('..') != 0) {
+			if(includeRegexp && !new RegExp(includeRegexp).test(fileName) && !fs.statSync(inputFile).isDirectory() || excludeRegexp && new RegExp(excludeRegexp).test(getUnixStylePath(inputFile)) || inputFile == output || path.relative(output, inputFile).indexOf('..') != 0 || path.relative(inputFile, output).indexOf('..') != 0) {
 				copy()
 			} else {
 				copyOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
