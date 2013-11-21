@@ -141,7 +141,8 @@ function isSrcDir(outputDir) {
 	return true
 }
 
-function uglifyParse(content) {
+function uglifyParse(content, opt) {
+	opt = opt || {}
 	var res
 	try {
 		res = uglify.parse(content)
@@ -150,7 +151,7 @@ function uglifyParse(content) {
 		var maxLineNoLen = 0
 		content = content.split(/\n|\r\n|\r/).slice(startLine - 1, e.line + 2)
 		content.forEach(function(line, i) {
-			var lineNo = (startLine + i + 87) + (startLine + i == e.line ? ' ->' : '   ')  +  '| '
+			var lineNo = (startLine + i) + (startLine + i == e.line ? ' ->' : '   ')  +  '| '
 			maxLineNoLen = Math.max(maxLineNoLen, lineNo.length)
 			content[i] = lineNo + line
 		})
@@ -159,8 +160,7 @@ function uglifyParse(content) {
 				content[i] = ' ' + line
 			}
 		})
-		console.log(content.length);
-		log('Failed to uglify JS content at line ' + e.line + ': ' + EOL + content.join(EOL), 1)
+		log('Failed to uglify JS content at line' + e.line + ' column' + e.col + (opt.files ? ', in file(s) ' + opt.files.join(', ') : '') + ': ' + EOL + content.join(EOL), 1)
 		dealErr(e)
 	}
 	return res
@@ -179,7 +179,7 @@ function getUglified(content, info, opt) {
 	} else {
 		content = replaceProperties(content, properties)
 	}
-	ast = uglifyParse(content)
+	ast = uglifyParse(content, {files: opt.files})
 	if(level > 0) {
 		ast.figure_out_scope()
 		ast = ast.transform(uglify.Compressor({warnings: false}))
@@ -335,7 +335,7 @@ function getIncProcessed(input, info, callback, opt) {
 			if(extName == '.js') {
 				res = [
 					plainId ? '<script type="text/plain" id="' + plainId + '">' : '<script type="text/javascript">',
-					getUglified(res, {uglify: ug}, {inline: true}),
+					getUglified(res, {uglify: ug}, {inline: true, files: [file]}),
 					'</script>'
 				].join(EOL)
 			} else if(extName == '.css') {
@@ -360,7 +360,7 @@ function getIncProcessed(input, info, callback, opt) {
 					res = getUglified([
 						res,
 						(/\brequire-plugin\b/).test(id) ? 'require.processDefQueue()' : 'require.processDefQueue(\'\', ' + (baseUrl || 'require.PAGE_BASE_URL') + ', require.getBaseUrlConfig(' + (baseUrl || 'require.PAGE_BASE_URL') + '))'
-					].join(EOL), {uglify: ug}, {inline: true})
+					].join(EOL), {uglify: ug}, {inline: true, files: [file]})
 					callback(res)
 				}, {id: id, reverseDepMap: reverseDepMap})
 			}
@@ -390,7 +390,7 @@ function getIncProcessed(input, info, callback, opt) {
 				eol = content ? EOL : ''
 				if(opt.tmpl && ug !== 0) {
 					//beautify micro template inline script
-					content = uglifyParse(content).print_to_string({beautify: true})
+					content = uglifyParse(content, {files: [input]}).print_to_string({beautify: true})
 				}
 				if(isNaN(parseInt(ug))) {
 					ug = isNaN(ugl) ? info.uglify : ugl
@@ -398,7 +398,7 @@ function getIncProcessed(input, info, callback, opt) {
 				if(ug === 0) {
 					eol = ''
 				}
-				return startTag + eol + getUglified(content, {uglify: ug}, {inline: true}) + eol + endTag
+				return startTag + eol + getUglified(content, {uglify: ug}, {inline: true, files: [input]}) + eol + endTag
 			})
 			if(info.lang) {
 				tmpl = lang.replaceProperties(tmpl, langResource[info.lang])
@@ -478,13 +478,13 @@ function compileTmpl(input, type, info, callback, opt) {
 		res = res.join(EOL)
 		if(opt.buildRoot && type == 'AMD') {
 			getBuiltAmdModContent(input, info, function(res) {
-				callback(uglifyParse(res).print_to_string({beautify: true}))
+				callback(uglifyParse(res, {files: [input]}).print_to_string({beautify: true}))
 			}, {content: res})
 		} else {
 			if(type == 'AMD') {
 				res = fixDefineParams(res, opt.id, opt.baseId)
 			}
-			callback(uglifyParse(res).print_to_string({beautify: true}))
+			callback(uglifyParse(res, {files: [input]}).print_to_string({beautify: true}))
 		}
 	}, utils.extendObject(opt, {tmpl: tmpl}))
 }
@@ -683,7 +683,7 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 			sourceFiles: sources
 		}, coffeeOptions))
 	} catch(e) {
-		log('Failed to compile coffee script: ' + inputs.join(', '), 1)
+		log('Failed to compile coffee script, error at line' + e.location.first_line + ': ' + inputs.join(', '), 1)
 		dealErr(e)
 	}
 	if(coffeeOptions.sourceMap) {
@@ -835,13 +835,13 @@ function buildOne(info, callback, allowSrcOutput) {
 		}
 		log('Merging: ' + output)
 		compileTmpl(input, 'AMD', info, function(res) {
-			res = getUglified(res, info)
+			res = getUglified(res, info, {files: [input]})
 			log('Writing: ' + output)
 			writeFileSync(output, res, charset)
 			if(buildNodeTpl) {
 				log('Merging: ' + nodeTplOutput)
 				compileTmpl(input, 'NODE', info, function(res) {
-					res = getUglified(res, info)
+					res = getUglified(res, info, {files: [input]})
 					log('Writing: ' + nodeTplOutput)
 					writeFileSync(nodeTplOutput, res, charset)
 					log('Done!')
@@ -860,7 +860,8 @@ function buildOne(info, callback, allowSrcOutput) {
 			if(compressHtml) {
 				exec('java -jar ' + htmlCompressorPath + ' ' + compressHtmlOptions + ' ' + output, function(err, stdout, stderr) {
 					if(err) {
-						throw err
+						log('Compress HTML error in file ' + input, 1)
+						dealErr(err)
 					} else {
 						writeFileSync(output, stdout, charset)
 						log('Done!')
@@ -886,7 +887,7 @@ function buildOne(info, callback, allowSrcOutput) {
 	} else {
 		log('Merging: ' + input)
 		getBuiltAmdModContent(input, info, function(res) {
-			res = getUglified(res, info)
+			res = getUglified(res, info, {files: [input]})
 			log('Writing: ' + output)
 			writeFileSync(output, res, charset)
 			log('Done!')
@@ -934,20 +935,19 @@ function combineOne(info, callback) {
 					fileContent.push(css)
 					combineNext()
 				})
+			} else if(path.extname(fileName) == '.css' && compressCss) {
+				fileContent.push(cssmin(fs.readFileSync(fileName, charset)))
+				combineNext()
+			} else if(path.extname(fileName) == '.js') {
+				fileContent.push(getUglified(fs.readFileSync(fileName, charset), info, {files: [fileName]}))
+				combineNext()
 			} else {
 				fileContent.push(fs.readFileSync(fileName, charset))
 				combineNext()
 			}
 		} else {
 			log('Writing: ' + output)
-			if(path.extname(output) == '.js') {
-				fileContent = getUglified(fileContent.join(EOLEOL), info)
-			} else if(path.extname(output) == '.css' && compressCss) {
-				fileContent = cssmin(fileContent.join(EOLEOL))
-			} else {
-				fileContent = fileContent.join(EOLEOL)
-			}
-			writeFileSync(output, fileContent, charset)
+			writeFileSync(output, fileContent.join(EOLEOL), charset)
 			log('Done!')
 			callback()
 		}
