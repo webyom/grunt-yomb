@@ -404,7 +404,7 @@ function getIncProcessed(input, info, callback, opt) {
 				tmpl = lang.replaceProperties(tmpl, langResource[info.lang])
 			}
 			if((/\.tpl\.html?$/).test(input)) {
-				strict = (/\b\$data\b/).test(tmpl)
+				strict = (/(^|[^.]+)\B\$data\./).test(tmpl)
 				tmpl = ['<%;(function() {%>', strict ? '' : '<%with($data) {%>', tmpl, strict ? '' : '<%}%>', '<%})();%>'].join(EOL)
 			}
 			callback(tmpl.replace(/\r\n/g, '\n'))
@@ -493,7 +493,7 @@ function fixDefineParams(def, depId, baseId) {
 	var bodyDeps
 	def = getBodyDeps(def)
 	bodyDeps = def.deps
-	def = def.def.replace(/\b(define\s*\()\s*(?:(["'])([^"'\s]+)\2\s*,\s*)?\s*(\[[^\[\]]*\])?/m, function(full, d, quote, definedId, deps) {
+	def = def.def.replace(/(^|[^.]+?)\b(define\s*\()\s*(?:(["'])([^"'\s]+)\3\s*,\s*)?\s*(\[[^\[\]]*\])?/m, function(full, b, d, quote, definedId, deps) {
 		var id
 		if(bodyDeps.length) {
 			bodyDeps = "'" + bodyDeps.join("', '") + "'"
@@ -512,7 +512,7 @@ function fixDefineParams(def, depId, baseId) {
 				id = './' + id
 			}
 		}
-		return [d, id && ("'" + getUnixStylePath(id) + "', "), deps || "['require', 'exports', 'module'], "].join('')
+		return [b, d, id && ("'" + getUnixStylePath(id) + "', "), deps || "['require', 'exports', 'module'], "].join('')
 	})
 	return def
 }
