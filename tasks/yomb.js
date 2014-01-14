@@ -278,7 +278,7 @@ function getIncProcessed(input, info, callback, opt) {
 	var baseUrl, ugl
 	if(reverseDepMap[input]) {
 		log('Warn: "' + input + '" have circular reference!')
-		return ''
+		callback('')
 	}
 	reverseDepMap[input] = 1
 	if(info.lang) {
@@ -348,7 +348,10 @@ function getIncProcessed(input, info, callback, opt) {
 		}
 		return res
 	}).replace(/<!--\s*require\s+(['"])([^'"]+)\1(?:\s+plain-id:([\w-]+))?\s*-->/mg, function(full, quote, id, plainId) {
-		var file = path.join(inputDir, id).replace(/\.js$/, '') + '.js'
+		var file = path.join(inputDir, id).replace(/\.js$/, '')
+		if(!(/\.tpl\.html?$/).test(id)) {
+			file += '.js'
+		}
 		var asyncMark = '<YOMB_INC_PROCESS_ASYNC_MARK_' + asyncQueue.length + '>'
 		var ug = isNaN(ugl) ? info.uglify : ugl
 		id = getUnixStylePath(id.replace(/\.js$/, ''))
@@ -557,6 +560,11 @@ function getBuiltAmdModContent(input, info, callback, opt) {
 				fileContent.push(fixDefineParams(fs.readFileSync(fileName, charset), depId, opt.id))
 				mergeOne()
 			}
+		} else if((/\.tpl\.html?$/).test(input)) {
+			compileTmpl(input, 'AMD', info, function(res) {
+				fileContent.push(res)
+				callback(fileContent.join(EOLEOL))
+			}, {id: opt.id, reverseDepMap: opt.reverseDepMap})
 		} else {
 			fileContent.push(fixDefineParams(content, opt.id))
 			callback(fileContent.join(EOLEOL))
