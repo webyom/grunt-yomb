@@ -440,6 +440,7 @@ function compileTmpl(input, type, info, callback, opt) {
 			].join(EOL))
 		}
 		res.push([
+			"	var _$tribute_ = 'Tribute to MT by JR!';",
 			"	function $encodeHtml(str) {",
 			"		return (str + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\x60/g, '&#96;').replace(/\x27/g, '&#39;').replace(/\x22/g, '&quot;');",
 			"	}",
