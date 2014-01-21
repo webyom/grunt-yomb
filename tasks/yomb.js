@@ -193,7 +193,7 @@ function getUglified(content, info, opt) {
 function getBodyDeps(def) {
 	var deps = []
 	var got = {}
-	def = def.replace(/(^|[^\.\/\w])require\s*\(\s*(["'])([^"']+?)\2\s*\)/mg, function(full, lead, quote, dep) {
+	def = def.replace(/(^|[^.]+?)\brequire\s*\(\s*(["'])([^"']+?)\2\s*\)/mg, function(full, lead, quote, dep) {
 		var pDep = dep.replace(/\{\{([^{}]+)\}\}/g, "' + $1 + '")
 		got[dep] || deps.push(pDep)
 		got[dep] = 1
@@ -212,14 +212,14 @@ function getBodyDeps(def) {
 function getRelativeDeps(def, exclude) {
 	var deps = []
 	var got = {}
-	var depArr = def.match(/(?:^|[^\.\/\w])define\s*\([^\[\{]*(\[[^\[\]]*\])/m)
+	var depArr = def.match(/(?:^|[^.]+?)\bdefine\s*\([^\[\{]*(\[[^\[\]]*\])/m)
 	depArr = depArr && depArr[1]
 	exclude = exclude || {}
 	depArr && depArr.replace(/(["'])(\.[^"']+?)\1/mg, function(full, quote, dep) {
 		got[dep] || exclude[dep] || globalExclude[dep] || deps.push(dep)
 		got[dep] = 1
 	})
-	def.replace(/(?:^|[^\.\/\w])require\s*\(\s*(["'])(\.[^"']+?)\1\s*\)/mg, function(full, quote, dep) {
+	def.replace(/(?:^|[^.]+?)\brequire\s*\(\s*(["'])(\.[^"']+?)\1\s*\)/mg, function(full, quote, dep) {
 		got[dep] || exclude[dep] || globalExclude[dep] || deps.push(dep)
 		got[dep] = 1
 	})
@@ -497,7 +497,16 @@ function fixDefineParams(def, depId, baseId) {
 	var bodyDeps
 	def = getBodyDeps(def)
 	bodyDeps = def.deps
-	def = def.def.replace(/(^|[^.]+?)\b(define\s*\()\s*(?:(["'])([^"'\s]+)\3\s*,\s*)?\s*(\[[^\[\]]*\])?/m, function(full, b, d, quote, definedId, deps) {
+	if(!(/(^|[^.]+?)\bdefine\s*\(/).test(def.def) && (/(^|[^.]+?)\bmodule\.exports\b/).test(def.def)) {
+		def = [
+			fix('define(', '', 'define(') + 'function(require, exports, module) {',
+				def.def,
+			'});'
+		].join(EOL)
+	} else {
+		def = def.def.replace(/(^|[^.]+?)\b(define\s*\()\s*(?:(["'])([^"'\s]+)\3\s*,\s*)?\s*(\[[^\[\]]*\])?/m, fix)
+	}
+	function fix(full, b, d, quote, definedId, deps) {
 		var id
 		if(bodyDeps.length) {
 			bodyDeps = "'" + bodyDeps.join("', '") + "'"
@@ -517,7 +526,7 @@ function fixDefineParams(def, depId, baseId) {
 			}
 		}
 		return [b, d, id && ("'" + getUnixStylePath(id) + "', "), deps || "['require', 'exports', 'module'], "].join('')
-	})
+	}
 	return def
 }
 
