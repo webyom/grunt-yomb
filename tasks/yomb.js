@@ -497,7 +497,7 @@ function fixDefineParams(def, depId, baseId) {
 	var bodyDeps
 	def = getBodyDeps(def)
 	bodyDeps = def.deps
-	if(!(/(^|[^.]+?)\bdefine\s*\(/).test(def.def) && (/(^|[^.]+?)\bmodule\.exports\b/).test(def.def) && !(/\bnode\.js\b/i).test(def.def)) {
+	if(!(/(^|[^.]+?)\bdefine\s*\(/).test(def.def) && (/(^|[^.]+?)\bmodule\.exports\b/).test(def.def)) {
 		def = [
 			fix('define(', '', 'define(') + 'function(require, exports, module) {',
 				def.def,
