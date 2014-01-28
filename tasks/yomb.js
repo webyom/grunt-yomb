@@ -740,16 +740,17 @@ function buildOneDir(info, callback, baseName) {
 			inputFile = path.resolve(inputDir, buildList.shift())
 			if(ignore[inputFile] || (/^\.|~$/).test(path.basename(inputFile))) {
 				build()
-			} else if(path.basename(inputFile) == 'main.js' || (/-main\.js$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.js') {
+			} else if(path.basename(inputFile) == 'main.js' || (/[-_.]main\.js$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.js') {
 				fileName = path.basename(inputFile)
 				outputFile = path.join(outputDir, fileName)
 				if(inputFile == outputFile) {
-					outputFile = outputFile.replace(/\.js$/, '-built.js')
+					tmp = inputFile.match(/([-_.])main\.js$/)
+					outputFile = outputFile.replace(/\.js$/, (tmp && tmp[1] || '-') + 'built.js')
 				}
 				buildOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
 					build()
 				}, true)
-			} else if(path.basename(inputFile) == 'main.less' || (/-main\.less$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.less') {
+			} else if(path.basename(inputFile) == 'main.less' || (/[-_.]main\.less$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.less') {
 				fileName = path.basename(inputFile).replace(/\.less$/, '.css')
 				outputFile = path.join(outputDir, fileName)
 				buildOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
