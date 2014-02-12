@@ -22,7 +22,7 @@ As JS file, html file of which name is "main.tpl" or end with "-main.tpl", "\_ma
 
 ### Require AMD modules in template
 As templates will be built into AMD modules, they can also require other AMD modules.
-```
+```javascript
 <%
 var $ = require('jquery');
 var fooTpl = require('./foo.tpl.html');
@@ -82,7 +82,7 @@ Firstly you need to create a *Gruntfile.js* file in the root filder of your proj
 YOM builder is built on NodeJS. You can run it in command line like this:  
 `node path/to/builder.js`
 In "coffee-" and "build-" targets, you can set "ignore" property to ignore some folders or files.
-```
+```javascript
 'coffee-all': {
   files: [
     {
@@ -165,7 +165,7 @@ eg. `<!-- cssmin true -->`
 ### Use language resource in html source file
 Language resource can be used as `${{a.b.c}}$` in html source file
 If you have a language resource file "lang/en/foo.js" as below.
-```
+```javascript
 define({
   label: {
     bar: 'Bar'
