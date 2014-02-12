@@ -1,13 +1,14 @@
 {
   "name": "grunt-yomb",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "YOM builder",
   "keywords": [
     "YOM",
+    "amd",
     "builder",
     "gruntplugin"
   ],
-  "homepage": "https://github.com/webyom/yomb",
+  "homepage": "https://github.com/webyom/grunt-yomb",
   "author": {
     "name": "Gary Wang",
     "email": "webyom@gmail.com",
@@ -15,15 +16,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/webyom/yomb.git"
+    "url": "https://github.com/webyom/grunt-yomb.git"
   },
   "bugs": {
-    "url": "https://github.com/webyom/yomb/issues"
+    "url": "https://github.com/webyom/grunt-yomb/issues"
   },
   "licenses": [
     {
       "type": "MIT",
-      "url": "https://github.com/webyom/yomb.git/blob/master/LICENSE-MIT"
+      "url": "https://github.com/webyom/grunt-yomb.git/blob/master/LICENSE-MIT"
     }
   ],
   "main": "Gruntfile.js",

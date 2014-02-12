@@ -740,7 +740,7 @@ function buildOneDir(info, callback, baseName) {
 			inputFile = path.resolve(inputDir, buildList.shift())
 			if(ignore[inputFile] || (/^\.|~$/).test(path.basename(inputFile))) {
 				build()
-			} else if(path.basename(inputFile) == 'main.js' || (/[-_.]main\.js$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.js') {
+			} else if((/(^|[-_.])main\.js$/).test(path.basename(inputFile))) {
 				fileName = path.basename(inputFile)
 				outputFile = path.join(outputDir, fileName)
 				if(inputFile == outputFile) {
@@ -750,13 +750,13 @@ function buildOneDir(info, callback, baseName) {
 				buildOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
 					build()
 				}, true)
-			} else if(path.basename(inputFile) == 'main.less' || (/[-_.]main\.less$/).test(inputFile) || path.basename(inputFile) == path.basename(inputDir) + '.less') {
+			} else if((/(^|[-_.])main\.less$/).test(path.basename(inputFile))) {
 				fileName = path.basename(inputFile).replace(/\.less$/, '.css')
 				outputFile = path.join(outputDir, fileName)
 				buildOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
 					build()
 				}, true)
-			} else if((/(^|\-)main\.tpl\.html?$/).test(inputFile) || globalBuildTpl && (/\.tpl\.html?$/).test(inputFile)) {
+			} else if((/(^|[-_.])main\.tpl\.html?$/).test(path.basename(inputFile)) || globalBuildTpl && (/\.tpl\.html?$/).test(inputFile)) {
 				fileName = path.basename(inputFile) + '.js'
 				outputFile = path.join(outputDir, fileName)
 				buildOne(utils.extendObject(utils.cloneObject(info), {input: inputFile, output: outputFile}), function() {
