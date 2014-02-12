@@ -74,7 +74,7 @@ define(['require', 'exports', 'module', 'lang/' + G.LANG + '/foo'], function(req
 ```
 
 ## Usage
-Firstly you need to create a *Gruntfile.js* file in the root filder of your project. Then add a "yomb" task in grunt file, then add some targets in yomb task. The name of a target should be start with "coffee-",  "build-", "concat-" or "copy-". You can run yomb task with command `grunt yomb`.
+Firstly you need to create a *Gruntfile.js* file ([example](https://github.com/webyom/grunt-yomb-example/blob/master/Gruntfile.js)) in the root filder of your project. Then add a "yomb" task in grunt file, then add some targets in yomb task. The name of a target should be start with "coffee-",  "build-", "concat-" or "copy-". You can run yomb task with command `grunt yomb`.
 - `coffee-` : compile coffeescript file into javascript file.
 - `build-` : build AMD module, micro template or html source file.
 - `concat-` : concat one or multiple files into one file.
@@ -173,3 +173,6 @@ define({
 });
 ```
 You can use `${{foo.label.bar}}$` in html source file.
+
+## Examples
+https://github.com/webyom/grunt-yomb-example
