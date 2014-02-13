@@ -148,7 +148,7 @@ eg. `<!-- include "lang/%{{_lang_}}%/foo.js" -->`
     eg. `{"lang": {"base": "./js/lang"}}`
 
 ## Optimize html file
-YOM builder can build external JS and CSS file into Html file, in order to enhance the page performance by reducing http request amount. Html file of which name is end with ".src" is considerred the source file to be optimized, and the optimized result file will be output to the output folder with the name without ".src". Micro template file can also be optimized in this way. Below are instructions of optimization. Html file of which name is end with ".inc" is reusable html segment file, which can be included in the source file.
+YOM builder can build external JS and CSS file into Html file, in order to enhance the page performance by reducing http request amount. Html file of which name is end with ".src" is considerred the source file to be optimized, and the optimized result file will be output to the output folder with the name without ".src". Micro template file can also be optimized in this way. Below are instructions of optimization. Html file of which name is end with ".inc" is reusable html segment file, which can be included in the source file ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/html-optimization), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/html-optimization)).
 - `include` : Include an external file into the Html source file, the included file can also be Html source file, and the optimization is done recursively.  
 eg. `<!-- include "./mod1.js" -->`, `<!-- include "./segment.inc.html" -->`  
 You can even specify a plain-id to the instruction, in order to make the JS code not execuded immediately, and execude it on demand.  
