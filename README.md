@@ -7,13 +7,13 @@ Firstly you need to install [nodejs](http://nodejs.org/) and [npm](https://www.n
 ## Conventions
 Too many configarations bring in complexity and is hard to maintain, so we make some conventions to ease our work.  
 *We use "(example)" or "(dist, src)" to show an example. "src" links to source files, and "dist" links to built result files.*  
-- JS file of which name is "main" or end with "-main", "\_main", ".main" is the target building file. For example, "main.js", "index-main.js", "index\_main.js" and "index.main.js" are target building files. ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/simple), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/simple))
+- JS file of which name is "main" or end with "-main", "\_main", ".main" is the target building file. For example, "main.js", "index-main.js", "index\_main.js" and "index.main.js" are target building files ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/simple), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/simple)). 
 - Dependancy module with relative path will be packaged with target building file. This process is recursive, which means if "main" requires "./foo", and "./foo" requires "./bar", then "main", "./foo" and "./bar" will be packaged together.
 `var foo = require('./foo');`  
 `var bar = require('../bar');`  
 `var vender = require('vender');`  
-foo and bar will be packaged with target building file.  
-If the output file is in the same folder, the output file names are "main-built.js" and "index-main-built.js" in order not to overwrite the orignal files, or else the output file name is the same as the target building file.
+foo and bar will be packaged with target building file ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/package-dependancy), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/package-dependancy)).  
+If the output file is in the same folder, the output file names are "main-built.js", "index-main-built.js", "index_main_built.js" and "index.main.built.js" in order not to overwrite the orignal files, or else the output file name is the same as the target building file ([example](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/same-folder-output)). 
 - Html file of which name is end with '.tpl' is micro template file. This file will be built into AMD module file. For example, you have a file named "cargo-list.tpl.html", and you can require it as below.  
 `var cargoListTmpl = require('./cargo-list.tpl.html');`  
 Then you can use it as below.  

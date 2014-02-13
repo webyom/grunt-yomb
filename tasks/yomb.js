@@ -113,7 +113,7 @@ function writeFileSync(toPath, content, encoding, lang) {
 			protectedPath = path.resolve(buildDir, globalProtect)
 			pathProtected = isPathProtected(toPath, protectedPath)
 		} else if(Array.isArray(globalProtect)) {
-			for(i = 0; i < globalProtect; i++) {
+			for(i = 0; i < globalProtect.length; i++) {
 				protectedPath = path.resolve(buildDir, globalProtect[i])
 				pathProtected = isPathProtected(toPath, protectedPath)
 				if(pathProtected) {
@@ -123,7 +123,7 @@ function writeFileSync(toPath, content, encoding, lang) {
 		}
 	}
 	if(pathProtected) {
-		log('Warning: "' + protectedPath + '" is protected!')
+		log('Warning: can not write file "' + toPath + '" as "' + protectedPath + '" is protected!', 1)
 		return
 	}
 	if(properties && charset) {
