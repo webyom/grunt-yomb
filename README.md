@@ -5,8 +5,9 @@ YOM builder is a tool for packaging AMD modules, compiling micro templates and o
 Firstly you need to install [nodejs](http://nodejs.org/) and [npm](https://www.npmjs.org/), then install [grunt](http://gruntjs.com/) with command `npm install -g grunt` as we use grunt to run yomb tasks. At last use command `npm install grunt-yomb --save-dev` to install our builder.
 
 ## Conventions
-Too many configarations bring in complexity and is hard to maintain, so we make some conventions to ease our work.
-- JS file of which name is "main" or end with "-main", "\_main", ".main" is the target building file. For example, "main.js", "index-main.js", "index\_main.js" and "index.main.js" are target building files.
+Too many configarations bring in complexity and is hard to maintain, so we make some conventions to ease our work.  
+*We use "(example)" or "(dist, src)" to show an example. "src" links to source files, and "dist" links to built result files.*  
+- JS file of which name is "main" or end with "-main", "\_main", ".main" is the target building file. For example, "main.js", "index-main.js", "index\_main.js" and "index.main.js" are target building files. ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/simple), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/simple))
 - Dependancy module with relative path will be packaged with target building file. This process is recursive, which means if "main" requires "./foo", and "./foo" requires "./bar", then "main", "./foo" and "./bar" will be packaged together.
 `var foo = require('./foo');`  
 `var bar = require('../bar');`  
@@ -31,7 +32,7 @@ var fooTpl = require('./foo.tpl.html');
 ```
 
 ### Write AMD module like nodejs module
-You can write your client AMD module like writing a nodejs module, yomb will build it into a formalized amd module. You must assign your module implementation to `module.exports`.
+You can write your client AMD module like writing a nodejs module, yomb will build it into a formalized AMD module. You must assign your module implementation to `module.exports`.
 ```javascript
 var $ = require('jquery');
 var foo = {};

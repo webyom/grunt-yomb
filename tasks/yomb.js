@@ -239,7 +239,9 @@ function traversalGetRelativeDeps(inputDir, inputId, def, exclude, processed, cu
 		processed[inputId] = 1
 	}
 	while(deps.length) {
-		depId = path.join(path.relative(inputDir, curDir), deps.shift()).split(path.sep).join('/')
+		depId = path.join(path.relative(inputDir, curDir), deps.shift())
+		depId = path.relative(inputDir, path.join(inputDir, depId))
+		depId = depId.split(path.sep).join('/')
 		if(!(/^\./).test(depId)) {
 			depId = './' + depId
 		}
