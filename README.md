@@ -18,8 +18,8 @@ If the output file is in the same folder, the output file names are "main-built.
 `var cargoListTmpl = require('./cargo-list.tpl.html');`  
 Then you can use it as below.  
 `$('cargo-list').innerHTML = cargoListTmpl.render(data);`  
-As JS file, html file of which name is "main.tpl" or end with "-main.tpl", "\_main.tpl", ".main.tpl" will be built into AMD module file. For example, "foo-main.tpl.html" will be built into "foo-main.tpl.html.js".
-- less file of which name is "main" or end with "-main", "\_main", ".main" will be built into css file. For example, "foo-main.less" will be built into "foo-main.css". 
+As JS file, html file of which name is "main.tpl" or end with "-main.tpl", "\_main.tpl", ".main.tpl" will be built into AMD module file. For example, "foo-main.tpl.html" will be built into "foo-main.tpl.html.js" ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/compile-template), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/compile-template)).
+- less file of which name is "main" or end with "-main", "\_main", ".main" will be built into css file. For example, "foo-main.less" will be built into "foo-main.css" ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/compile-less), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/compile-less)). 
 
 ### Require AMD modules in template
 As templates will be built into AMD modules, they can also require other AMD modules.
@@ -32,7 +32,7 @@ var fooTpl = require('./foo.tpl.html');
 ```
 
 ### Write AMD module like nodejs module
-You can write your client AMD module like writing a nodejs module, yomb will build it into a formalized AMD module. You must assign your module implementation to `module.exports`.
+You can write your client AMD module like writing a nodejs module, yomb will build it into a formalized AMD module. You must assign your module implementation to `module.exports` ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/write-like-nodejs), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/write-like-nodejs)).
 ```javascript
 var $ = require('jquery');
 var foo = {};
@@ -76,7 +76,7 @@ define(['require', 'exports', 'module', 'lang/' + G.LANG + '/foo'], function(req
 
 ## Usage
 Firstly you need to create a *Gruntfile.js* file ([example](https://github.com/webyom/grunt-yomb-example/blob/master/Gruntfile.js)) in the root filder of your project. Then add a "yomb" task in grunt file, then add some targets in yomb task. The name of a target should be start with "coffee-",  "build-", "concat-" or "copy-". You can run yomb task with command `grunt yomb`.
-- `coffee-` : compile coffeescript file into javascript file.
+- `coffee-` : compile coffeescript file into javascript file ([dist](https://github.com/webyom/grunt-yomb-example/blob/master/dist/examples/compile-coffee), [src](https://github.com/webyom/grunt-yomb-example/blob/master/src/examples/compile-coffee)).
 - `build-` : build AMD module, micro template or html source file.
 - `concat-` : concat one or multiple files into one file.
 - `copy-` : copy files.
