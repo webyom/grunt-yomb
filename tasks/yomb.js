@@ -105,10 +105,10 @@ function isPathProtected(path, protectedPath) {
 	return new RegExp('^' + protectedPath + '(\\/|$)').test(getUnixStylePath(path))
 }
 
-function writeFileSync(toPath, content, encoding, lang) {
+function writeFileSync(toPath, content, encoding, lang, skipProtectChecking) {
 	var pathProtected = false
 	var i, protectedPath
-	if(globalProtect) {
+	if(globalProtect && !skipProtectChecking) {
 		if(typeof globalProtect == 'string') {
 			protectedPath = path.resolve(buildDir, globalProtect)
 			pathProtected = isPathProtected(toPath, protectedPath)
@@ -126,7 +126,7 @@ function writeFileSync(toPath, content, encoding, lang) {
 		log('Warning: can not write file "' + toPath + '" as "' + protectedPath + '" is protected!', 1)
 		return
 	}
-	if(properties && charset) {
+	if(properties) {
 		properties._lang_ = lang || undefined
 		content = replaceProperties(content, properties)
 		properties._lang_ = undefined
@@ -644,7 +644,7 @@ function compileDirCoffee(info, callback, baseName) {
 				outputFile = path.join(outputDir, fileName)
 				compileOneCoffee(utils.extendObject(utils.cloneObject(info), {inputs: [inputFile], output: outputFile}), function() {
 					compiles()
-				}, true)
+				}, true, true)
 			} else if(fs.statSync(inputFile).isDirectory() && !(inputFile == outputDir || path.relative(inputFile, outputDir).indexOf('..') != 0)) {
 				compileDirCoffee({input: inputFile, output: info.output, ignore: ignore}, function() {
 					compiles()
@@ -658,7 +658,7 @@ function compileDirCoffee(info, callback, baseName) {
 	}
 }
 
-function compileOneCoffee(info, callback, allowSrcOutput) {
+function compileOneCoffee(info, callback, allowSrcOutput, skipProtectChecking) {
 	if(!checkCondition(info.condition)) {
 		callback()
 		return
@@ -707,10 +707,10 @@ function compileOneCoffee(info, callback, allowSrcOutput) {
 		dealErr(e)
 	}
 	if(coffeeOptions.sourceMap) {
-		writeFileSync(output, result.js + EOL + '//@ sourceMappingURL=' + outputFilename + '.map', charset)
-		writeFileSync(output + '.map', result.v3SourceMap, charset)
+		writeFileSync(output, result.js + EOL + '//@ sourceMappingURL=' + outputFilename + '.map', charset, null, skipProtectChecking)
+		writeFileSync(output + '.map', result.v3SourceMap, charset, null, skipProtectChecking)
 	} else {
-		writeFileSync(output, result, charset)
+		writeFileSync(output, result, charset, null, skipProtectChecking)
 	}
 	callback()
 }
