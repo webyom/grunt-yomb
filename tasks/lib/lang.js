@@ -7,6 +7,7 @@
 
 var fs = require('fs')
 var path = require('path')
+var langRegExp = /\${{([\w\-\.]+)}}\$/g
 
 function getProperty(propName, properties) {
 	var tmp, res
@@ -18,13 +19,23 @@ function getProperty(propName, properties) {
 	return res
 }
 
-exports.replaceProperties = function(content, properties) {
+exports.replaceProperties = function(content, properties, _lv) {
+	_lv = _lv || 1
 	if(!properties) {
 		return content
 	}
-	return content.replace(/\${{([\w-\.]+)}}\$/g, function(full, propName) {
+	return content.replace(langRegExp, function(full, propName) {
 		var res = getProperty(propName, properties)
-		return typeof res == 'string' ? res : full
+		if(typeof res != 'string') {
+			res = '*' + propName + '*'
+		} else if(langRegExp.test(res)) {
+			if(_lv > 3) {
+				res = '**' + propName + '**'
+			} else {
+				res = exports.replaceProperties(res, properties, _lv + 1)
+			}
+		}
+		return res
 	})
 }
 

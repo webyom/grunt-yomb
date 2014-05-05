@@ -105,7 +105,7 @@ function isPathProtected(path, protectedPath) {
 	return new RegExp('^' + protectedPath + '(\\/|$)').test(getUnixStylePath(path))
 }
 
-function writeFileSync(toPath, content, encoding, lang, skipProtectChecking) {
+function writeFileSync(toPath, content, encoding, langCode, skipProtectChecking) {
 	var pathProtected = false
 	var i, protectedPath
 	if(globalProtect && !skipProtectChecking) {
@@ -127,7 +127,7 @@ function writeFileSync(toPath, content, encoding, lang, skipProtectChecking) {
 		return
 	}
 	if(properties) {
-		properties._lang_ = lang || undefined
+		properties._lang_ = langCode || undefined
 		content = replaceProperties(content, properties)
 		properties._lang_ = undefined
 	}
@@ -1023,8 +1023,24 @@ function copyOne(info, callback, _deep) {
 		if(!globalAllowSrcOutput && !isSrcDir(outputDir)) {
 			throw new Error('Output to src dir denied!')
 		}
-		if((/\.(js|css|html|htm)$/).test(input)) {
-			grunt.file.copy(input, output, {encoding: charset})
+		if((/\.(js|css|html|htm)$/).test(input.toLowerCase())) {
+			if(info.i18n && langResource) {
+				var langCode
+				for(var i = 0; i < langResource.LANG_LIST.length; i++) {
+					var m = input.match(new RegExp('\\/(' + langResource.LANG_LIST[i] + ')\\/'))
+					if(m) {
+						langCode = m[1];
+						break;
+					}
+				}
+				if(langCode) {
+					writeFileSync(output, lang.replaceProperties(fs.readFileSync(input, charset), langResource[langCode]), charset)
+				} else {
+					grunt.file.copy(input, output, {encoding: charset})
+				}
+			} else {
+				grunt.file.copy(input, output, {encoding: charset})
+			}
 		} else {
 			grunt.file.copy(input, output, {encoding: null})
 		}
