@@ -381,7 +381,7 @@ function getIncProcessed(input, info, callback, opt) {
 		var asyncItem = asyncQueue.shift()
 		if(asyncItem) {
 			asyncItem.processor(function(res) {
-				tmpl = tmpl.replace(new RegExp(asyncItem.mark, 'g'), res)
+				tmpl = tmpl.replace(new RegExp(asyncItem.mark, 'g'), function() {return res})
 				mergeOne()
 			})
 		} else {
